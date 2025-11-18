@@ -15,7 +15,6 @@ export const MyCampaignCard: React.FC<MyCampaignCardProps> = ({ contractAddress 
         address: contractAddress,
     });
 
-    // Get Campaign Name
     const { data: name } = useReadContract({
         contract, 
         method: "function name() view returns (string)", 

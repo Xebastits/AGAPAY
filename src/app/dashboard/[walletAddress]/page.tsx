@@ -106,7 +106,7 @@ const CreateCampaignModal = (
             onSuccess: () => {
                 alert("Campaign created successfully!");
                 setIsModalOpen(false);
-                refetch();  // Refresh campaigns 
+                refetch();
             },
             onError: (error) => {
                 console.error("Failed to create campaign:", error);
@@ -177,7 +177,7 @@ const CreateCampaignModal = (
                     <button
                         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md"
                         onClick={handleDeployContract}
-                        disabled={isPending}  // Disable while pending
+                        disabled={isPending} 
                     >{
                         isPending ? "Creating Campaign..." : "Create Campaign"
                     }</button>
