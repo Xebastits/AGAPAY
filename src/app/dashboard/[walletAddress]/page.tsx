@@ -25,9 +25,11 @@ export default function DashboardPage() {
     // Get Campaigns
     const { data: myCampaigns, isLoading: isLoadingMyCampaigns, refetch } = useReadContract({
         contract: contract,
-        method: "function getUserCampaigns(address _user) view returns ((address campaignAddress, address owner, string name, uint256 creationTime)[])",
+        method: "function getUserCampaigns(address _user) view returns ((address campaignAddress, address owner, string name)[])",
         params: [account?.address as string]
     });
+
+
     
     return (
         <div className="mx-auto max-w-7xl px-4 mt-16 sm:px-6 lg:px-8">
@@ -73,11 +75,15 @@ const CreateCampaignModal = (
     { setIsModalOpen, refetch }: CreateCampaignModalProps
 ) => {
     const account = useActiveAccount();
-    const { mutate: sendTransaction, isPending } = useSendTransaction(); 
-    const [campaignName, setCampaignName] = useState<string>("");
-    const [campaignDescription, setCampaignDescription] = useState<string>("");
-    const [campaignGoal, setCampaignGoal] = useState<number>(1); 
-    const [campaignDeadline, setCampaignDeadline] = useState<number>(1);  
+    const { mutate: sendTransaction, isPending } = useSendTransaction();
+    const [isEmergencyMode, setIsEmergencyMode] = useState<boolean>(false);
+    const [editableName, setEditableName] = useState<string>("");
+    const [editableDescription, setEditableDescription] = useState<string>("");
+    const [campaignGoal, setCampaignGoal] = useState<number>(1);
+    const [campaignDeadline, setCampaignDeadline] = useState<number>(1);
+
+    const campaignName = isEmergencyMode ? "[EMERGENCY] " + editableName : editableName;
+    const campaignDescription = isEmergencyMode ? "[EMERGENCY] " + editableDescription : editableDescription;
 
     const contract = getContract({
         client: client,
@@ -131,6 +137,45 @@ const CreateCampaignModal = (
         }
     };
 
+    const handleNameChange = (value: string) => {
+        if (isEmergencyMode) {
+            if (value.startsWith("[EMERGENCY] ")) {
+                setEditableName(value.slice("[EMERGENCY] ".length));
+            } else {
+                // Prevent removing the prefix
+                return;
+            }
+        } else {
+            setEditableName(value);
+        }
+    };
+
+    const handleDescriptionChange = (value: string) => {
+        if (isEmergencyMode) {
+            if (value.startsWith("[EMERGENCY] ")) {
+                setEditableDescription(value.slice("[EMERGENCY] ".length));
+            } else {
+                // Prevent removing the prefix
+                return;
+            }
+        } else {
+            setEditableDescription(value);
+        }
+    };
+
+    const handleEmergencyToggle = (checked: boolean) => {
+        setIsEmergencyMode(checked);
+        if (checked) {
+            // If turning on, remove prefix from editable if present
+            if (editableName.startsWith("[EMERGENCY] ")) {
+                setEditableName(editableName.slice("[EMERGENCY] ".length));
+            }
+            if (editableDescription.startsWith("[EMERGENCY] ")) {
+                setEditableDescription(editableDescription.slice("[EMERGENCY] ".length));
+            }
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center backdrop-blur-md">
             <div className="w-1/2 bg-slate-100 p-6 rounded-md">
@@ -142,18 +187,28 @@ const CreateCampaignModal = (
                     >Close</button>
                 </div>
                 <div className="flex flex-col">
+                    <div className="flex items-center mb-4">
+                        <input
+                            type="checkbox"
+                            id="emergencyMode"
+                            checked={isEmergencyMode}
+                            onChange={(e) => handleEmergencyToggle(e.target.checked)}
+                            className="mr-2"
+                        />
+                        <label htmlFor="emergencyMode" className="text-sm font-medium">Emergency Mode</label>
+                    </div>
                     <label>Campaign Name:</label>
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         value={campaignName}
-                        onChange={(e) => setCampaignName(e.target.value)}
+                        onChange={(e) => handleNameChange(e.target.value)}
                         placeholder="Campaign Name"
                         className="mb-4 px-4 py-2 bg-slate-300 rounded-md"
                     />
                     <label>Campaign Description:</label>
                     <textarea
                         value={campaignDescription}
-                        onChange={(e) => setCampaignDescription(e.target.value)}
+                        onChange={(e) => handleDescriptionChange(e.target.value)}
                         placeholder="Campaign Description"
                         className="mb-4 px-4 py-2 bg-slate-300 rounded-md"
                     ></textarea>

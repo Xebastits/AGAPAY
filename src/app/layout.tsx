@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   title: "Agapay",
   description:
     "A BLOCKCHAIN ENABLED WEB APPLICATION CROWDFUNDING PLATFORM FOR SOCIAL WELFARE ASSISTANCE",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

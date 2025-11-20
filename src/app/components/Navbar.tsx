@@ -3,7 +3,7 @@ import { client } from "@/app/client";
 import Link from "next/link";
 import { ConnectButton, lightTheme, useActiveAccount } from "thirdweb/react";
 import Image from 'next/image';
-import thirdwebIcon from "@public/thirdweb.svg";
+import thirdwebIcon from "@public/favicon.ico";
 
 const Navbar = () => {
     const account = useActiveAccount();

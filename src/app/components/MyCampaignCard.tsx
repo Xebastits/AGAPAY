@@ -1,7 +1,7 @@
 import { client } from "@/app/client";
 import Link from "next/link";
 import { getContract } from "thirdweb";
-import { baseSepolia } from "thirdweb/chains";
+import { sepolia } from "thirdweb/chains";
 import { useReadContract } from "thirdweb/react";
 
 type MyCampaignCardProps = {
@@ -11,21 +11,41 @@ type MyCampaignCardProps = {
 export const MyCampaignCard: React.FC<MyCampaignCardProps> = ({ contractAddress }) => {
     const contract = getContract({
         client: client,
-        chain: baseSepolia,
+        chain: sepolia,
         address: contractAddress,
     });
 
     const { data: name } = useReadContract({
-        contract, 
-        method: "function name() view returns (string)", 
+        contract,
+        method: "function name() view returns (string)",
         params: []
     });
 
-    const { data: description } = useReadContract({ 
-        contract, 
-        method: "function description() view returns (string)", 
-        params: [] 
+    const { data: description } = useReadContract({
+        contract,
+        method: "function description() view returns (string)",
+        params: []
       });
+
+    const { data: goal, isLoading: isLoadingGoal } = useReadContract({
+        contract: contract,
+        method: "function goal() view returns (uint256)",
+        params: [],
+    });
+
+    const { data: balance, isLoading: isLoadingBalance } = useReadContract({
+        contract: contract,
+        method: "function getContractBalance() view returns (uint256)",
+        params: [],
+    });
+
+    const totalBalance = balance?.toString();
+    const totalGoal = goal?.toString();
+    let balancePercentage = (parseInt(totalBalance as string) / parseInt(totalGoal as string)) * 100;
+
+    if (balancePercentage >= 100) {
+        balancePercentage = 100;
+    }
 
     return (
             <div className="flex flex-col justify-between max-w-sm p-6 bg-white border border-slate-200 rounded-lg shadow">
