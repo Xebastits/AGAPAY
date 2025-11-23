@@ -92,14 +92,30 @@ export default function CampaignPage() {
                     <p className="text-4xl font-semibold">{name}</p>
                 )}
                 {owner === account?.address && (
-                    <div className="flex flex-row">
+                    <div className="flex flex-row space-x-2">
                         {isEditing && !isLoadingStatus && (
-                            <p className="px-4 py-2 bg-gray-500 text-white rounded-md mr-2">
-                                Status:  
-                                {status === 0 ? " Active" : 
+                            <p className="px-4 py-2 bg-gray-500 text-white rounded-md">
+                                Status:
+                                {status === 0 ? " Active" :
                                 status === 1 ? " Successful" :
                                 status === 2 ? " Failed" : "Unknown"}
                             </p>
+                        )}
+                        {status === 1 && (
+                            <TransactionButton
+                                transaction={() => prepareContractCall({
+                                    contract: contract,
+                                    method: "function withdraw()",
+                                    params: []
+                                })}
+                                onTransactionConfirmed={() => {
+                                    alert("Withdrawal successful!");
+                                }}
+                                onError={(error) => alert(`Error: ${error.message}`)}
+                                theme={lightTheme()}
+                            >
+                                Withdraw Funds
+                            </TransactionButton>
                         )}
                         <button
                             className="px-4 py-2 bg-blue-500 text-white rounded-md"
