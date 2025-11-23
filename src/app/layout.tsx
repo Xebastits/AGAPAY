@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description:
     "A BLOCKCHAIN ENABLED WEB APPLICATION CROWDFUNDING PLATFORM FOR SOCIAL WELFARE ASSISTANCE",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/logofavicon.ico",
   },
 };
 

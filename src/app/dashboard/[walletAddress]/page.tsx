@@ -8,13 +8,15 @@ import { defineChain } from "thirdweb/chains";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
 import { prepareContractCall } from "thirdweb";
 import { useSendTransaction } from "thirdweb/react";
+import { sepolia } from "thirdweb/chains";
 
 export default function DashboardPage() {
     const account = useActiveAccount();
     // debugging
     // console.log("address", account?.address);
-    
+
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
 
     const contract = getContract({
         client: client,
@@ -40,14 +42,30 @@ export default function DashboardPage() {
                     onClick={() => setIsModalOpen(true)}
                 >Create Campaign</button>
             </div>
-            <p className="text-2xl font-semibold mb-4">My Campaigns:</p>
+            <div className="flex flex-row justify-between items-center mb-4">
+                <p className="text-2xl font-semibold">My Campaigns:</p>
+                <div className="flex items-center">
+                    <label className="mr-2 text-sm font-medium">Filter by Status:</label>
+                    <select
+                        value={selectedFilter}
+                        onChange={(e) => setSelectedFilter(e.target.value as 'all' | 'active' | 'successful' | 'failed')}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-md"
+                    >
+                        <option value="all">All</option>
+                        <option value="active">Active</option>
+                        <option value="successful">Successful</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+            </div>
             <div className="grid grid-cols-3 gap-4">
                 {!isLoadingMyCampaigns && (
                     myCampaigns && myCampaigns.length > 0 ? (
                         myCampaigns.map((campaign, index) => (
-                            <MyCampaignCard
+                            <CampaignWithStatus
                                 key={index}
                                 contractAddress={campaign.campaignAddress}
+                                selectedFilter={selectedFilter}
                             />
                         ))
                     ) : (
@@ -241,4 +259,31 @@ const CreateCampaignModal = (
             </div>
         </div>
     );
+};
+
+type CampaignWithStatusProps = {
+    contractAddress: string;
+    selectedFilter: 'all' | 'active' | 'successful' | 'failed';
+};
+
+const CampaignWithStatus: React.FC<CampaignWithStatusProps> = ({ contractAddress, selectedFilter }) => {
+    const contract = getContract({
+        client: client,
+        chain: sepolia,
+        address: contractAddress,
+    });
+
+    const { data: status } = useReadContract({
+        contract: contract,
+        method: "function state() view returns (uint8)",
+        params: [],
+    });
+
+    const statusString = status === 0 ? 'active' : status === 1 ? 'successful' : status === 2 ? 'failed' : 'unknown';
+
+    if (selectedFilter !== 'all' && statusString !== selectedFilter) {
+        return null;
+    }
+
+    return <MyCampaignCard contractAddress={contractAddress} />;
 };
