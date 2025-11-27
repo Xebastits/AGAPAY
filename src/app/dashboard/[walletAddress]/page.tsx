@@ -5,8 +5,11 @@ import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import { MyCampaignCard } from "../../components/MyCampaignCard";
 import { useState, useEffect } from "react";
 import { getContract } from "thirdweb";
-import { polygonAmoy } from "thirdweb/chains";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
+import { polygonAmoy, sepolia } from "thirdweb/chains";
+import { useNetwork } from '../../contexts/NetworkContext';
+
+const { selectedChain, setSelectedChain } = useNetwork();
 
 // Imports for Data & Image
 import { db } from "@/app/lib/firebase"; 
@@ -24,14 +27,17 @@ type CampaignRequest = {
 };
 
 export default function DashboardPage() {
+    const { selectedChain, setSelectedChain } = useNetwork();   
     const account = useActiveAccount();
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
     const [pendingRequests, setPendingRequests] = useState<CampaignRequest[]>([]);
 
+
+
     const contract = getContract({
         client: client,
-        chain: polygonAmoy,
+        chain: selectedChain,
         address: CROWDFUNDING_FACTORY,
     });
 
@@ -333,7 +339,7 @@ type CampaignWithStatusProps = {
 const CampaignWithStatus: React.FC<CampaignWithStatusProps> = ({ contractAddress, selectedFilter }) => {
     const contract = getContract({
         client: client,
-        chain: polygonAmoy,
+        chain: selectedChain,
         address: contractAddress,
     });
 

@@ -11,7 +11,8 @@ import { useSendTransaction } from "thirdweb/react";
 import { client } from "@/app/client"; 
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import Link from "next/link";
-import { polygonAmoy } from "thirdweb/chains";
+import { polygonAmoy, sepolia } from "thirdweb/chains";
+import { useNetwork } from '../contexts/NetworkContext';
 
 interface Campaign {
   id: string;
@@ -26,13 +27,14 @@ interface Campaign {
 }
 
 export default function AdminPage() {
+const { selectedChain, setSelectedChain } = useNetwork();   
   const account = useActiveAccount();
   const router = useRouter();
   
   // 1. Blockchain Setup
   const factoryContract = getContract({
       client: client,
-      chain: polygonAmoy,
+      chain: selectedChain,
       address: CROWDFUNDING_FACTORY,
   });
 

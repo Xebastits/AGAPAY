@@ -3,14 +3,19 @@ import { client } from "@/app/client";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { getContract, prepareContractCall, toEther, toWei } from "thirdweb";
-import { polygonAmoy } from "thirdweb/chains";
 import { lightTheme, TransactionButton, useActiveAccount, useReadContract } from "thirdweb/react";
+import { polygonAmoy, sepolia } from "thirdweb/chains";
+import { useNetwork } from '../../contexts/NetworkContext';
+
 
 // --- FIREBASE IMPORTS ---
 import { db } from "@/app/lib/firebase"; 
 import { collection, query, where, getDocs } from "firebase/firestore";
 
+
 export default function CampaignPage() {
+
+    const { selectedChain, setSelectedChain } = useNetwork();
     const account = useActiveAccount();
     const { campaignAddress } = useParams();
     const [donationAmount, setDonationAmount] = useState<string>("");
@@ -20,7 +25,7 @@ export default function CampaignPage() {
 
     const contract = getContract({
         client: client,
-        chain: polygonAmoy,
+        chain: selectedChain,
         address: campaignAddress as string,
     });
 

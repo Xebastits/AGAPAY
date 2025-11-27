@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
 import Navbar from "./components/Navbar";
 import AuthGuard from "./components/AuthGuard";
+import { NetworkProvider } from "./contexts/NetworkContext";
 
 
 
@@ -27,10 +28,12 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-slate-100 text-slate-700">
         <ThirdwebProvider>
-          {/* 2. Place the Guard here. It protects everything below it. */}
+           <NetworkProvider>
+          {}
           <AuthGuard /> 
           <Navbar />
           {children}
+          </NetworkProvider>
         </ThirdwebProvider>
       </body>
     </html>

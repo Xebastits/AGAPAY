@@ -4,13 +4,17 @@ import { client } from "@/app/client"; // Adjust path if needed
 import { getContract } from "thirdweb";
 import { CampaignCard } from "../components/CampaignCard"; // Adjust path if needed
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
-import { polygonAmoy } from "thirdweb/chains";
 import { useState, useEffect } from "react";
+import { polygonAmoy, sepolia } from "thirdweb/chains";
+import { useNetwork } from '../contexts/NetworkContext';
+
 
 export default function CampaignsPage() {
+
+  const { selectedChain, setSelectedChain } = useNetwork();
   const contract = getContract({
     client: client,
-    chain: polygonAmoy,
+    chain: selectedChain,
     address: CROWDFUNDING_FACTORY,
   });
 
