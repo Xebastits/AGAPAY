@@ -1,17 +1,22 @@
 'use client';
 import { client } from "@/app/client";
 import { useParams } from "next/navigation";
-import { useState } from "react";
-import { getContract, prepareContractCall, ThirdwebContract } from "thirdweb";
+import { useState, useEffect } from "react";
+import { getContract, prepareContractCall, toEther, toWei } from "thirdweb";
 import { polygonAmoy } from "thirdweb/chains";
 import { lightTheme, TransactionButton, useActiveAccount, useReadContract } from "thirdweb/react";
-import { toEther } from "thirdweb";
+
+// --- FIREBASE IMPORTS ---
+import { db } from "@/app/lib/firebase"; 
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function CampaignPage() {
     const account = useActiveAccount();
     const { campaignAddress } = useParams();
-    const [isEditing, setIsEditing] = useState<boolean>(false);
-    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [donationAmount, setDonationAmount] = useState<string>("");
+    
+    // --- State for Image ---
+    const [imageUrl, setImageUrl] = useState<string>("");
 
     const contract = getContract({
         client: client,
@@ -19,207 +24,263 @@ export default function CampaignPage() {
         address: campaignAddress as string,
     });
 
-    // Name of the campaign
+    // --- HELPER: Format Currency ---
+    const formatCurrency = (val: bigint | undefined) => {
+        if (!val) return "0";
+        if (val > 1_000_000_000n) return toEther(val);
+        return val.toString();
+    };
+
+    // 1. Fetch Name
     const { data: name, isLoading: isLoadingName } = useReadContract({
         contract: contract,
         method: "function name() view returns (string)",
         params: [],
     });
 
-    // Description of the campaign
+    // --- Fetch Image from Firebase ---
+    useEffect(() => {
+        const fetchImage = async () => {
+            if (!name) return;
+            try {
+                const q = query(collection(db, "campaigns"), where("name", "==", name));
+                const snapshot = await getDocs(q);
+                if (!snapshot.empty) {
+                    setImageUrl(snapshot.docs[0].data().imageUrl);
+                }
+            } catch (err) {
+                console.error("Error fetching image:", err);
+            }
+        };
+        fetchImage();
+    }, [name]);
+
+    // 2. Fetch Description
     const { data: description, isLoading: isLoadingDescription } = useReadContract({ 
         contract, 
         method: "function description() view returns (string)", 
         params: [] 
     });
 
-    // Campaign deadline
+    // 3. Deadline Logic
     const { data: deadline, isLoading: isLoadingDeadline } = useReadContract({
         contract: contract,
         method: "function deadline() view returns (uint256)",
         params: [],
     });
-    // Convert deadline to a date
     const deadlineDate = deadline ? new Date(parseInt(deadline.toString()) * 1000) : null;
-    // Check if deadline has passed
     const hasDeadlinePassed = deadlineDate ? deadlineDate < new Date() : false;
 
-    // Goal amount of the campaign
+    // 4. Goal & Balance
     const { data: goal, isLoading: isLoadingGoal } = useReadContract({
         contract: contract,
         method: "function goal() view returns (uint256)",
         params: [],
     });
     
-    // Total funded balance of the campaign
     const { data: balance, isLoading: isLoadingBalance } = useReadContract({
         contract: contract,
         method: "function getContractBalance() view returns (uint256)",
         params: [],
     });
 
-    // Calculate the total funded balance percentage
-    const totalBalance = balance?.toString();
-    const totalGoal = goal?.toString();
-    let balancePercentage = totalGoal && parseInt(totalGoal) > 0 ? (parseInt(totalBalance || "0") / parseInt(totalGoal)) * 100 : 0;
+    const totalBalance = balance ? Number(formatCurrency(balance)) : 0;
+    const totalGoal = goal ? Number(formatCurrency(goal)) : 0;
+    
+    let balancePercentage = totalGoal > 0 ? (totalBalance / totalGoal) * 100 : 0;
     if (balancePercentage >= 100) balancePercentage = 100;
 
-    // Get tiers for the campaign
-    const { data: tiers, isLoading: isLoadingTiers, refetch: refetchTiers } = useReadContract({
-        contract: contract,
-        method: "function getTiers() view returns ((string name, uint256 amount, uint256 backers)[])",
-        params: [],
-    });
-
-    // Get owner of the campaign
-    const { data: owner, isLoading: isLoadingOwner } = useReadContract({
+    // 5. Owner & State
+    const { data: owner } = useReadContract({
         contract: contract,
         method: "function owner() view returns (address)",
         params: [],
     });
 
-    // Get status of the campaign
     const { data: status, isLoading: isLoadingStatus } = useReadContract({ 
         contract, 
         method: "function state() view returns (uint8)", 
         params: [] 
     });
 
+    const getStatusText = (s: number | undefined) => {
+        if (s === 0) return "Active";
+        if (s === 1) return "Successful";
+        if (s === 2) return "Failed";
+        return "Unknown";
+    };
 
     return (
-        <div className="mx-auto max-w-7xl px-2 mt-4 sm:px-6 lg:px-8">
-            <div className="flex flex-row justify-between items-center">
-                {!isLoadingName && (
-                    <p className="text-4xl font-semibold">{name}</p>
+        <div className="mx-auto max-w-7xl px-4 mt-8 sm:px-6 lg:px-8 pb-20">
+            
+            {/* --- HERO IMAGE SECTION --- */}
+            <div className="w-full h-64 md:h-96 bg-slate-100 rounded-xl overflow-hidden mb-8 shadow-sm relative">
+                {imageUrl ? (
+                    <img 
+                        src={imageUrl} 
+                        alt={name || "Campaign Cover"} 
+                        className="w-full h-full object-cover"
+                    />
+                ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 flex-col gap-2">
+                         <svg className="w-16 h-16 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                         <span className="font-semibold opacity-50">No Cover Image</span>
+                    </div>
                 )}
+                
+                {/* Status Badge Over Image */}
+                {!isLoadingStatus && (
+                    <div className="absolute top-4 right-4">
+                        <span className={`px-4 py-2 text-sm font-bold rounded-full shadow-md uppercase tracking-wide ${
+                            status === 0 ? "bg-green-500 text-white" :
+                            status === 1 ? "bg-blue-600 text-white" :
+                            "bg-red-600 text-white"
+                        }`}>
+                            {getStatusText(status)}
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* HEADER INFO */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    {!isLoadingName && <h1 className="text-4xl font-bold text-slate-900">{name}</h1>}
+                    {!isLoadingDescription && (
+                         <p className="text-sm text-slate-400 mt-1 font-mono truncate max-w-xs">
+                             Creator: {owner}
+                         </p>
+                    )}
+                </div>
+
+                {/* OWNER ACTIONS */}
                 {owner === account?.address && (
-                    <div className="flex flex-row space-x-2">
-                        {isEditing && !isLoadingStatus && (
-                            <p className="px-4 py-2 bg-gray-500 text-white rounded-md">
-                                Status:
-                                {status === 0 ? " Active" :
-                                status === 1 ? " Successful" :
-                                status === 2 ? " Failed" : "Unknown"}
-                            </p>
-                        )}
-                        {status === 1 && (
+                    <div className="flex gap-2">
+                         {status === 1 && (
                             <TransactionButton
                                 transaction={() => prepareContractCall({
                                     contract: contract,
                                     method: "function withdraw()",
                                     params: []
                                 })}
-                                onTransactionConfirmed={() => {
-                                    alert("Withdrawal successful!");
-                                }}
+                                onTransactionConfirmed={() => alert("Withdrawal successful!")}
                                 onError={(error) => alert(`Error: ${error.message}`)}
                                 theme={lightTheme()}
+                                className="!bg-green-600 !text-white"
                             >
                                 Withdraw Funds
                             </TransactionButton>
                         )}
-                        <button
-                            className="px-4 py-2 bg-blue-500 text-white rounded-md"
-                            onClick={() => setIsEditing(!isEditing)}
-                        >{isEditing ? "Done" : "Edit"}</button>
                     </div>
                 )}
             </div>
-            <div className="my-4">
-                <p className="text-lg font-semibold">Description:</p>
-                {!isLoadingDescription && <p>{description}</p>}
-            </div>
-            <div className="mb-4">
-                <p className="text-lg font-semibold">Deadline</p>
-                {!isLoadingDeadline && deadlineDate && (
-                    <p>{deadlineDate.toDateString()}</p>
-                )}
-            </div>
-            {!isLoadingBalance && !isLoadingGoal && (
-                <div className="mb-4">
-                    <p className="text-lg font-semibold">Campaign Goal: ${goal?.toString()}</p>
-                    <div className="relative w-full h-6 bg-gray-200 rounded-full dark:bg-gray-700">
-                        <div className="h-6 bg-blue-600 rounded-full dark:bg-blue-500 text-right" style={{ width: `${balancePercentage?.toString()}%`}}>
-                            <p className="text-white dark:text-white text-xs p-1">${balance?.toString()}</p>
-                        </div>
-                        <p className="absolute top-0 right-0 text-white dark:text-white text-xs p-1">
-                            {balancePercentage >= 100 ? "" : `${balancePercentage?.toString()}%`}
-                        </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* LEFT COLUMN: Description */}
+                <div className="md:col-span-2">
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 mb-8">
+                        <h3 className="text-lg font-bold mb-4 border-b pb-2">About this Campaign</h3>
+                        {!isLoadingDescription && <p className="text-slate-600 whitespace-pre-wrap leading-relaxed">{description}</p>}
                     </div>
                 </div>
-            )}
 
-            
-            {isModalOpen && (
-                <CreateCampaignModal
-                    setIsModalOpen={setIsModalOpen}
-                    contract={contract}
-                    refetchTiers={refetchTiers}
-                />
-            )}
+                {/* RIGHT COLUMN: Stats & Donation */}
+                <div className="flex flex-col gap-6">
+                    
+                    {/* PROGRESS CARD */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                        <div className="mb-4">
+                            {/* UPDATED: Currency Symbol to ₱ */}
+                            <p className="text-4xl font-extrabold text-blue-600">₱ {formatCurrency(balance)}</p>
+                            <p className="text-sm text-slate-500 font-medium mt-1">
+                                raised of <span className="text-slate-800 font-bold">₱ {formatCurrency(goal)}</span> goal
+                            </p>
+                        </div>
+
+                        <div className="relative w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-2">
+                            <div 
+                                className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out" 
+                                style={{ width: `${balancePercentage}%`}}
+                            />
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-500 font-bold">
+                            <span>{balancePercentage.toFixed(1)}% Funded</span>
+                            <span>
+                                {!isLoadingDeadline && deadlineDate && (
+                                    <span className={hasDeadlinePassed ? "text-red-500" : ""}>
+                                        {hasDeadlinePassed ? "Ended" : deadlineDate.toLocaleDateString()}
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* DONATION CARD */}
+                    {status === 0 && !hasDeadlinePassed && (
+                        <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 shadow-sm">
+                            <h3 className="text-lg font-bold text-blue-900 mb-4">Make a Contribution</h3>
+                            
+                            <div className="space-y-4">
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        {/* UPDATED: Input Icon to ₱ */}
+                                        <span className="text-blue-500 font-bold text-xl">₱</span>
+                                    </div>
+                                    <input 
+                                        type="number" 
+                                        value={donationAmount}
+                                        onChange={(e) => setDonationAmount(e.target.value)}
+                                        placeholder="Amount"
+                                        className="pl-10 pr-4 py-3 w-full border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg font-semibold text-slate-700"
+                                    />
+                                </div>
+                                
+                                <TransactionButton
+                                    transaction={() => prepareContractCall({
+                                        contract: contract,
+                                        method: "function donate()",
+                                        params: [],
+                                        value: toWei(donationAmount || "0")
+                                    })}
+                                    onTransactionConfirmed={() => {
+                                        alert("Donation successful!");
+                                        setDonationAmount("");
+                                    }}
+                                    onError={(error) => alert(`Error: ${error.message}`)}
+                                    theme={lightTheme()}
+                                    disabled={!donationAmount || parseFloat(donationAmount) <= 0}
+                                    className="!w-full !py-4 !text-lg !font-bold !rounded-lg"
+                                >
+                                    Donate Now
+                                </TransactionButton>
+                            </div>
+                            <p className="text-xs text-blue-400 mt-3 text-center">
+                                Secure transaction on Blockchain
+                            </p>
+                        </div>
+                    )}
+
+                    {/* REFUND ACTION */}
+                    {status === 2 && (
+                        <div className="bg-red-50 p-6 rounded-lg border border-red-100 text-center shadow-sm">
+                            <h3 className="text-lg font-bold text-red-800 mb-2">Campaign Failed</h3>
+                            <p className="text-sm text-red-600 mb-4">The funding goal was not met. Contributors can claim a refund.</p>
+                            <TransactionButton
+                                transaction={() => prepareContractCall({
+                                    contract: contract,
+                                    method: "function refund()",
+                                    params: []
+                                })}
+                                onTransactionConfirmed={() => alert("Refund processed!")}
+                                theme={lightTheme()}
+                                className="!bg-red-600 !text-white !w-full"
+                            >
+                                Claim Refund
+                            </TransactionButton>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
-}
-
-type CreateTierModalProps = {
-    setIsModalOpen: (value: boolean) => void
-    contract: ThirdwebContract
-    refetchTiers: () => void
-}
-
-const CreateCampaignModal = (
-    { setIsModalOpen, contract, refetchTiers }: CreateTierModalProps
-) => {
-    const [tierName, setTierName] = useState<string>("");
-    const [tierAmount, setTierAmount] = useState<bigint>(1n);
-
-    const isValid = tierName.trim() && tierAmount > 0n;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center backdrop-blur-md">
-            <div className="w-1/2 bg-slate-100 p-6 rounded-md">
-                <div className="flex justify-between items-center mb-4">
-                    <p className="text-lg font-semibold">Create a Funding Tier</p>
-                    <button
-                        className="text-sm px-4 py-2 bg-slate-600 text-white rounded-md"
-                        onClick={() => setIsModalOpen(false)}
-                    >Close</button>
-                </div>
-                <div className="flex flex-col">
-                    <label>Tier Name:</label>
-                    <input 
-                        type="text" 
-                        value={tierName}
-                        onChange={(e) => setTierName(e.target.value)}
-                        placeholder="Tier Name"
-                        className="mb-4 px-4 py-2 bg-slate-200 rounded-md"
-                        aria-label="Tier Name"
-                    />
-                    <label>Tier Cost:</label>
-                    <input 
-                        type="number"
-                        value={tierAmount.toString()}
-                        onChange={(e) => setTierAmount(BigInt(e.target.value || "0"))}
-                        className="mb-4 px-4 py-2 bg-slate-200 rounded-md"
-                        aria-label="Tier Amount"
-                    />
-                    <TransactionButton
-                        transaction={() => prepareContractCall({
-                            contract: contract,
-                            method: "function addTier(string _name, uint256 _amount)",
-                            params: [tierName, tierAmount]
-                        })}
-                        onTransactionConfirmed={async () => {
-                            alert("Tier added successfully!")
-                            refetchTiers();  // Refetch tiers after adding
-                            setIsModalOpen(false)
-                        }}
-                        onError={(error) => alert(`Error: ${error.message}`)}
-                        theme={lightTheme()}
-                        disabled={!isValid}  // Disable if invalid
-                    >Add Tier</TransactionButton>
-                </div>
-            </div>
-        </div>
-    )
 }

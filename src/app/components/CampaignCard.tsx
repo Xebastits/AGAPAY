@@ -5,7 +5,7 @@ import { polygonAmoy } from "thirdweb/chains";
 import { useReadContract } from "thirdweb/react";
 import { useState, useEffect } from "react";
 
-// Firebase Imports
+// Firebase Imports (Image Only now)
 import { db } from "@/app/lib/firebase"; 
 import { collection, query, where, getDocs } from "firebase/firestore";
 
@@ -13,20 +13,17 @@ type CampaignCardProps = {
     campaignAddress: string;
     showEmergencyFirst?: boolean;
     creationTime?: bigint;
-    // We make these optional because we might fetch them from Firebase now
-    imageUrl?: string;       
-    isEmergency?: boolean;   
+    imageUrl?: string; 
 };
 
 export const CampaignCard: React.FC<CampaignCardProps> = ({ 
     campaignAddress, 
+    showEmergencyFirst = false, // Default to false
     creationTime,
-    imageUrl: propImageUrl,     // Rename to avoid conflict with state
-    isEmergency: propIsEmergency // Rename to avoid conflict with state
+    imageUrl,     
 }) => {
-    // State for data fetched from Firebase
+    // State for Image only
     const [firebaseImage, setFirebaseImage] = useState<string>("");
-    const [firebaseIsEmergency, setFirebaseIsEmergency] = useState<boolean>(false);
 
     const contract = getContract({
         client: client,
@@ -64,20 +61,18 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         params: [],
     });
 
-    // --- FETCH METADATA FROM FIREBASE ---
+    // --- FETCH IMAGE FROM FIREBASE (Removed Emergency fetch) ---
     useEffect(() => {
         const fetchMetadata = async () => {
             if (!campaignName) return;
 
             try {
-                // Match the Blockchain Name to the Firebase Document Name
                 const q = query(collection(db, "campaigns"), where("name", "==", campaignName));
                 const snapshot = await getDocs(q);
 
                 if (!snapshot.empty) {
                     const data = snapshot.docs[0].data();
                     setFirebaseImage(data.imageUrl);
-                    setFirebaseIsEmergency(data.isEmergency);
                 }
             } catch (error) {
                 console.error("Error fetching campaign image:", error);
@@ -87,11 +82,15 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         fetchMetadata();
     }, [campaignName]);
 
-    // Determine final values (Prop takes priority, then Firebase)
-    const finalImageUrl = propImageUrl || firebaseImage;
-    const finalIsEmergency = propIsEmergency || firebaseIsEmergency;
+    // --- EMERGENCY LOGIC (Copied from your example) ---
+    const isEmergency = campaignName && campaignDescription &&
+        (campaignName.toLowerCase().includes('emergency') ||
+         campaignDescription.toLowerCase().includes('emergency'));
 
-    // --- CURRENCY FORMATTER ---
+    // Final Image
+    const finalImageUrl = imageUrl || firebaseImage;
+
+    // --- FORMATTERS ---
     const formatCurrency = (val: bigint | undefined) => {
         if (!val) return "0";
         if (val > 1_000_000_000n) return toEther(val);
@@ -128,14 +127,13 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                      />
                  ) : (
                      <div className="flex items-center justify-center h-full text-slate-400 text-sm font-mono flex-col gap-2">
-                        {/* Placeholder Icon */}
                         <svg className="w-10 h-10 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         <span>No Image</span>
                      </div>
                  )}
                  
-                 {/* Emergency Badge */}
-                 {finalIsEmergency && (
+                 {/* Emergency Badge - Only shows if toggle is ON and is Emergency */}
+                 {showEmergencyFirst && isEmergency && (
                     <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-full shadow-lg flex items-center gap-1 z-10">
                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
                          <span className="text-xs font-bold uppercase tracking-wider">Emergency</span>
@@ -147,8 +145,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 {!isLoadingBalance && (
                     <div className="mb-4">
                         <div className="flex justify-between text-xs mb-1.5 font-bold text-slate-600">
-                            <span>Raised: ₱{displayBalance} </span>
-                            <span>Goal: ₱{displayGoal} </span>
+                            <span>Raised: {displayBalance} ₱</span>
+                            <span>Goal: {displayGoal} ₱</span>
                         </div>
                         <div className="relative w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-600 rounded-full transition-all duration-1000" style={{ width: `${percentage > 100 ? 100 : percentage}%`}}></div>

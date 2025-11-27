@@ -1,19 +1,11 @@
 'use client';
 import { useReadContract } from "thirdweb/react";
-import { client } from "@/app/client";
+import { client } from "@/app/client"; // Adjust path if needed
 import { getContract } from "thirdweb";
-// Make sure path is correct
-import { CampaignCard } from "../components/CampaignCard"; 
+import { CampaignCard } from "../components/CampaignCard"; // Adjust path if needed
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import { polygonAmoy } from "thirdweb/chains";
-import { useState, useEffect, useMemo } from "react";
-
-type CampaignData = {
-  campaignAddress: string;
-  owner: string;
-  name: string;
-  creationTime: bigint;
-};
+import { useState, useEffect } from "react";
 
 export default function CampaignsPage() {
   const contract = getContract({
@@ -22,99 +14,61 @@ export default function CampaignsPage() {
     address: CROWDFUNDING_FACTORY,
   });
 
-  const { data: campaigns, isLoading } = useReadContract({
+  // Fetch campaigns including creationTime
+  const { data: campaigns, isLoading: isLoadingCampaigns } = useReadContract({
     contract: contract,
-    method: "function getAllCampaigns() view returns ((address campaignAddress, address owner, string name, uint256 creationTime)[])", 
+    method: "function getAllCampaigns() view returns ((address campaignAddress, address owner, string name, uint256 creationTime)[])",
     params: []
   });
 
-  // Filter States
   const [showEmergencyFirst, setShowEmergencyFirst] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
-  const [selectedYear, setSelectedYear] = useState<string>('all');
-  
-  const [visibleCount, setVisibleCount] = useState(6); 
 
-  useEffect(() => {
-    setVisibleCount(6);
-  }, [showEmergencyFirst, selectedFilter, selectedYear]);
-
-  // Load preferences
+  // Load Preference
   useEffect(() => {
     const saved = localStorage.getItem('showEmergencyFirst');
-    if (saved) setShowEmergencyFirst(JSON.parse(saved));
+    if (saved) {
+      setShowEmergencyFirst(JSON.parse(saved));
+    }
   }, []);
 
+  // Save Preference
   useEffect(() => {
     localStorage.setItem('showEmergencyFirst', JSON.stringify(showEmergencyFirst));
   }, [showEmergencyFirst]);
 
-  // --- MAIN FILTERING LOGIC ---
-  const processedCampaigns = useMemo(() => {
-    if (!campaigns) return [];
-
-    let result = [...campaigns] as unknown as CampaignData[];
-
-    // 1. Filter by Year
-    if (selectedYear !== 'all') {
-      result = result.filter(c => {
-        const year = new Date(Number(c.creationTime) * 1000).getUTCFullYear().toString();
-        return year === selectedYear;
-      });
-    }
-
-    // 2. Sort by Time (Newest First)
-    result.sort((a, b) => Number(b.creationTime) - Number(a.creationTime));
-
-    // 3. Emergency Sort (Priority)
+  // --- REVISED SORTING LOGIC ---
+  const sortedCampaigns = campaigns ? [...campaigns].sort((a, b) => {
+    
+    // 1. PRIORITY SORT: Emergency (Only if toggle is ON)
     if (showEmergencyFirst) {
-      result.sort((a, b) => {
-        // Note: This matches "Emergency" in the name. 
-        // Real-time firebase fetching for sorting is expensive, 
-        // so this name-check is a good compromise for the list view.
         const aIsEmergency = a.name.toLowerCase().includes('emergency');
         const bIsEmergency = b.name.toLowerCase().includes('emergency');
-        if (aIsEmergency && !bIsEmergency) return -1; 
-        if (!aIsEmergency && bIsEmergency) return 1;  
-        return 0;
-      });
+
+        // If A is emergency and B is not -> A goes first
+        if (aIsEmergency && !bIsEmergency) return -1;
+        // If B is emergency and A is not -> B goes first
+        if (!aIsEmergency && bIsEmergency) return 1;
+        
+        // If both are Emergency (or both are NOT), we fall through to step 2...
     }
 
-    return result;
-  }, [campaigns, selectedYear, showEmergencyFirst]);
+    // 2. TIME SORT: Most Recent First (Descending)
+    // We compare the timestamps (bigint) directly.
+    return Number(b.creationTime) - Number(a.creationTime);
 
-  const visibleCampaigns = processedCampaigns.slice(0, visibleCount);
-
-  const availableYears = useMemo(() => {
-    if (!campaigns) return [];
-    const years = new Set(campaigns.map(c => new Date(Number(c.creationTime) * 1000).getUTCFullYear()));
-    return Array.from(years).sort((a, b) => b - a);
-  }, [campaigns]);
+  }) : [];
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 min-h-screen">
+    <main className="mx-auto max-w-7xl px-4 mt-4 sm:px-6 lg:px-8">
+      <div className="py-10">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <h1 className="text-4xl font-bold text-slate-800">Explore Campaigns</h1>
+          <h1 className="text-4xl font-bold text-slate-800">Campaigns</h1>
           
-          <div className="flex flex-wrap items-center gap-4">
-             {/* Year Filter */}
-             <div className="flex items-center bg-white border border-slate-300 rounded-md px-3 py-1">
-              <label className="mr-2 text-sm font-bold text-slate-500">Year:</label>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="bg-transparent outline-none py-1 text-slate-700"
-              >
-                <option value="all">All Time</option>
-                {availableYears.map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Status Filter */}
+          <div className="flex items-center space-x-4">
+            {/* Filter Dropdown */}
             <div className="flex items-center bg-white border border-slate-300 rounded-md px-3 py-1">
-              <label className="mr-2 text-sm font-bold text-slate-500">Status:</label>
+              <label className="mr-2 text-sm font-bold text-slate-500">Filter:</label>
               <select
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value as any)}
@@ -130,55 +84,52 @@ export default function CampaignsPage() {
             {/* Emergency Toggle */}
             <button
               onClick={() => setShowEmergencyFirst(!showEmergencyFirst)}
-              className={`px-3 py-2 rounded-md font-medium transition-colors ${
+              className={`px-4 py-2 rounded-md font-bold transition-colors shadow-sm ${
                 showEmergencyFirst
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
               }`}
             >
-              {showEmergencyFirst ? 'EMERGENCY' : 'EMERGENCY'}
+              {showEmergencyFirst ? 'EMERGENCY: ON' : 'EMERGENCY: OFF'}
             </button>
           </div>
         </div>
 
-        {/* CAMPAIGN GRID */}
+        {/* Grid Display */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {!isLoading && visibleCampaigns.length > 0 ? (
-            visibleCampaigns.map((campaign) => (
-              <CampaignWithStatus
-                key={campaign.campaignAddress}
-                campaignAddress={campaign.campaignAddress}
-                selectedFilter={selectedFilter} 
-                creationTime={campaign.creationTime}
-              />
-            ))
-          ) : (
-            !isLoading && <p className="col-span-3 text-center text-slate-400 py-20 border-2 border-dashed rounded-xl">No campaigns found matching your criteria.</p>
+          {!isLoadingCampaigns && sortedCampaigns && (
+            sortedCampaigns.length > 0 ? (
+              sortedCampaigns.map((campaign) => (
+                <CampaignWithStatus
+                  key={campaign.campaignAddress}
+                  campaignAddress={campaign.campaignAddress}
+                  showEmergencyFirst={showEmergencyFirst}
+                  selectedFilter={selectedFilter}
+                  creationTime={campaign.creationTime}
+                />
+              ))
+            ) : (
+              <p className="col-span-3 text-center text-slate-400 py-10">No Campaigns Found</p>
+            )
           )}
-          
-          {isLoading && <p className="col-span-3 text-center py-20">Loading blockchain data...</p>}
+          {isLoadingCampaigns && (
+             <p className="col-span-3 text-center py-10 text-slate-500">Loading blockchain data...</p>
+          )}
         </div>
-
-        {/* LOAD MORE BUTTON */}
-        {visibleCount < processedCampaigns.length && (
-          <div className="mt-12 text-center">
-            <button
-              onClick={() => setVisibleCount(prev => prev + 6)}
-              className="px-8 py-3 bg-blue-600 text-white font-bold rounded-full hover:bg-blue-700 transition shadow-lg transform hover:-translate-y-1"
-            >
-              Load More Campaigns
-            </button>
-            <p className="text-xs text-slate-400 mt-3 font-medium">
-              Showing {Math.min(visibleCount, processedCampaigns.length)} of {processedCampaigns.length} results
-            </p>
-          </div>
-        )}
+      </div>
     </main>
   );
 }
 
-// Helper Component
-const CampaignWithStatus = ({ campaignAddress, selectedFilter, creationTime }: any) => {
+// --- HELPER COMPONENT ---
+type CampaignWithStatusProps = {
+  campaignAddress: string;
+  showEmergencyFirst: boolean;
+  selectedFilter: 'all' | 'active' | 'successful' | 'failed';
+  creationTime: bigint;
+};
+
+const CampaignWithStatus: React.FC<CampaignWithStatusProps> = ({ campaignAddress, showEmergencyFirst, selectedFilter, creationTime }) => {
   const contract = getContract({
     client: client,
     chain: polygonAmoy,
@@ -193,8 +144,15 @@ const CampaignWithStatus = ({ campaignAddress, selectedFilter, creationTime }: a
 
   const statusString = status === 0 ? 'active' : status === 1 ? 'successful' : status === 2 ? 'failed' : 'unknown';
 
-  if (selectedFilter !== 'all' && statusString !== selectedFilter) return null;
+  if (selectedFilter !== 'all' && statusString !== selectedFilter) {
+    return null;
+  }
 
-  // We don't pass ImageUrl here, because the Card fetches it internally!
-  return <CampaignCard campaignAddress={campaignAddress} creationTime={creationTime} />;
+  return (
+    <CampaignCard 
+        campaignAddress={campaignAddress} 
+        showEmergencyFirst={showEmergencyFirst} 
+        creationTime={creationTime}
+    />
+  );
 };
