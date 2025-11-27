@@ -5,6 +5,8 @@ import { ThirdwebProvider } from "thirdweb/react";
 import Navbar from "./components/Navbar";
 import AuthGuard from "./components/AuthGuard";
 
+
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {

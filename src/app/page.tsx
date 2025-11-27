@@ -7,8 +7,8 @@ import { useEffect } from "react";
 import { isAdmin } from "./constants/admins";
 import { defineChain } from "thirdweb/chains";
 
-// 1. Define Polygon Amoy (Chain ID 80002)
-const NETWORK = defineChain(80002);
+const POLYGON_AMOY = defineChain(80002);
+const SEPOLIA = defineChain(11155111);
 
 export default function Home() {
   const account = useActiveAccount();
@@ -33,7 +33,7 @@ export default function Home() {
         {}
         <ConnectButton 
           client={client}
-          chains={[NETWORK]}
+          chains={[POLYGON_AMOY, SEPOLIA]} 
           theme="light"
         />
       </div>

@@ -270,7 +270,7 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-bold mb-1">Goal (ETH)</label>
+                            <label className="block text-sm font-bold mb-1">Goal (₱)</label>
                             <input type="number" value={goal} onChange={(e) => setGoal(Number(e.target.value))} className="w-full px-3 py-2 border rounded" />
                         </div>
                         <div>
