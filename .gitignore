@@ -8,6 +8,9 @@
 
 # testing
 /coverage
+/constants
+/constants/
+constants/
 
 # next.js
 /.next/

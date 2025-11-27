@@ -11,16 +11,16 @@ import { useActiveAccount, useReadContract } from "thirdweb/react";
 // Imports for Data & Image
 import { db } from "@/app/lib/firebase"; 
 import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
-// Note: Adjust this import path if your file is at src/lib/cloudinary.ts
 import { uploadToCloudinary } from "../../lib/cloudinary"; 
 
 type CampaignRequest = {
     id: string;
-    name: string;
+    name: string;      
+    fullName?: string; 
     description: string;
     status: string;
     rejectionReason?: string;
-    isEmergency?: boolean; // <--- Added Type
+    isEmergency?: boolean;
 };
 
 export default function DashboardPage() {
@@ -84,7 +84,10 @@ export default function DashboardPage() {
                                     </div>
                                 )}  
                                 <div className="flex justify-between items-start mb-2 mt-2">
-                                    <h4 className="font-bold text-lg truncate pr-2">{req.name}</h4>
+                                    <div>
+                                        <h4 className="font-bold text-lg truncate pr-2">{req.name}</h4>
+                                        {req.fullName && <p className="text-xs text-gray-400">By: {req.fullName}</p>}
+                                    </div>
                                     <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${
                                         req.status === 'rejected' ? 'bg-red-100 text-red-700' : 
                                         req.status === 'approved' ? 'bg-green-100 text-green-700' :
@@ -148,7 +151,7 @@ export default function DashboardPage() {
 }
 
 // --------------------------------------------------------
-// MODIFIED MODAL: NOW WITH EMERGENCY TOGGLE
+// CREATE MODAL
 // --------------------------------------------------------
 type CreateCampaignModalProps = {
     setIsModalOpen: (value: boolean) => void;
@@ -160,12 +163,13 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form State
-    const [name, setName] = useState("");
+    const [fullName, setFullName] = useState(""); 
+    const [name, setName] = useState("");         
     const [age, setAge] = useState(""); 
     const [description, setDescription] = useState("");
     const [goal, setGoal] = useState(1);
     const [deadline, setDeadline] = useState(30);
-    const [isEmergency, setIsEmergency] = useState(false); // <--- NEW STATE
+    const [isEmergency, setIsEmergency] = useState(false);
     
     // File State
     const [campaignImage, setCampaignImage] = useState<File | null>(null);
@@ -173,26 +177,31 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
 
     const handleSubmit = async () => {
         if (!account) return alert("Connect wallet first");
-        if (!name || !description || !age || !campaignImage || !idImage) {
-            return alert("Please fill all fields and upload BOTH images.");
+        if (!fullName || !name || !description || !age || !campaignImage || !idImage) {
+            return alert("Please fill all fields, including your Full Name, and upload BOTH images.");
         }
 
         try {
             setIsSubmitting(true);
 
-            // 1. Upload Images to Cloudinary
+            // 1. Upload Images
             const campUrl = await uploadToCloudinary(campaignImage);
             const idUrl = await uploadToCloudinary(idImage);
 
-            // 2. Save Data + Links + Emergency Flag to Firestore
+            // 2. LOGIC: Prepend string to Name if Emergency is checked.
+            // This ensures your "namecheck logic" (name.includes('emergency')) works elsewhere.
+            const finalName = isEmergency ? `(EMERGENCY) ${name}` : name;
+
+            // 3. Save Data
             await addDoc(collection(db, "campaigns"), {
                 creator: account.address,
-                name: name,
+                fullName: fullName, 
+                name: finalName,    // <--- Sending the Modified Name
                 description: description,
                 age: age,
                 goal: goal,
                 deadline: deadline,
-                isEmergency: isEmergency, // <--- SAVING PRIORITY FLAG
+                isEmergency: isEmergency,
                 imageUrl: campUrl,      
                 idImageUrl: idUrl,      
                 status: "pending",
@@ -220,16 +229,38 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
                 </div>
 
                 <div className="flex flex-col gap-4">
-                    {/* Basic Info */}
+                    {/* Identity Info */}
                     <div className="grid grid-cols-3 gap-4">
                          <div className="col-span-2">
-                            <label className="block text-sm font-bold mb-1">Full Name</label>
-                            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border rounded" placeholder="Campaign Title" />
+                            <label className="block text-sm font-bold mb-1">User's Legal Name</label>
+                            <input 
+                                value={fullName} 
+                                onChange={(e) => setFullName(e.target.value)} 
+                                className="w-full px-3 py-2 border rounded" 
+                                placeholder="John Doe" 
+                            />
                          </div>
                          <div>
                             <label className="block text-sm font-bold mb-1">Age</label>
-                            <input type="number" value={age} onChange={(e) => setAge(e.target.value)} className="w-full px-3 py-2 border rounded" placeholder="18+" />
+                            <input 
+                                type="number" 
+                                value={age} 
+                                onChange={(e) => setAge(e.target.value)} 
+                                className="w-full px-3 py-2 border rounded" 
+                                placeholder="18+" 
+                            />
                          </div>
+                    </div>
+
+                    {/* Campaign Info */}
+                    <div>
+                        <label className="block text-sm font-bold mb-1">Campaign Title</label>
+                        <input 
+                            value={name} 
+                            onChange={(e) => setName(e.target.value)} 
+                            className="w-full px-3 py-2 border rounded" 
+                            placeholder="e.g., Medical Fund for..." 
+                        />
                     </div>
 
                     <div>
@@ -265,7 +296,7 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
                             <label className={`block font-bold text-sm cursor-pointer ${isEmergency ? 'text-red-700' : 'text-slate-600'}`}>
                                 Mark as Emergency (High Priority)
                             </label>
-                            <p className="text-xs text-slate-500">Only check this for urgent causes like disasters or medical emergencies.</p>
+                            <p className="text-xs text-slate-500">Checking this will append "(EMERGENCY)" to your campaign title.</p>
                         </div>
                     </div>
 
@@ -293,7 +324,7 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
     );
 };
 
-// --- EXISTING HELPER (unchanged) ---
+// --- HELPER ---
 type CampaignWithStatusProps = {
     contractAddress: string;
     selectedFilter: 'all' | 'active' | 'successful' | 'failed';

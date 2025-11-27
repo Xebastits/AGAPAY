@@ -3,22 +3,31 @@ import Link from "next/link";
 import { getContract, toEther } from "thirdweb"; 
 import { polygonAmoy } from "thirdweb/chains";
 import { useReadContract } from "thirdweb/react";
+import { useState, useEffect } from "react";
+
+// Firebase Imports
+import { db } from "@/app/lib/firebase"; 
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 type CampaignCardProps = {
     campaignAddress: string;
     showEmergencyFirst?: boolean;
     creationTime?: bigint;
-    imageUrl?: string;       // <--- Required for images
-    isEmergency?: boolean;   // <--- Required for priority badge
+    // We make these optional because we might fetch them from Firebase now
+    imageUrl?: string;       
+    isEmergency?: boolean;   
 };
 
 export const CampaignCard: React.FC<CampaignCardProps> = ({ 
     campaignAddress, 
-    showEmergencyFirst = false,
     creationTime,
-    imageUrl,
-    isEmergency
+    imageUrl: propImageUrl,     // Rename to avoid conflict with state
+    isEmergency: propIsEmergency // Rename to avoid conflict with state
 }) => {
+    // State for data fetched from Firebase
+    const [firebaseImage, setFirebaseImage] = useState<string>("");
+    const [firebaseIsEmergency, setFirebaseIsEmergency] = useState<boolean>(false);
+
     const contract = getContract({
         client: client,
         chain: polygonAmoy,
@@ -55,11 +64,36 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
         params: [],
     });
 
-    // --- 1. HYBRID CURRENCY FORMATTER ---
-    // Fixes the "20000000..." vs "200" issue automatically
+    // --- FETCH METADATA FROM FIREBASE ---
+    useEffect(() => {
+        const fetchMetadata = async () => {
+            if (!campaignName) return;
+
+            try {
+                // Match the Blockchain Name to the Firebase Document Name
+                const q = query(collection(db, "campaigns"), where("name", "==", campaignName));
+                const snapshot = await getDocs(q);
+
+                if (!snapshot.empty) {
+                    const data = snapshot.docs[0].data();
+                    setFirebaseImage(data.imageUrl);
+                    setFirebaseIsEmergency(data.isEmergency);
+                }
+            } catch (error) {
+                console.error("Error fetching campaign image:", error);
+            }
+        };
+
+        fetchMetadata();
+    }, [campaignName]);
+
+    // Determine final values (Prop takes priority, then Firebase)
+    const finalImageUrl = propImageUrl || firebaseImage;
+    const finalIsEmergency = propIsEmergency || firebaseIsEmergency;
+
+    // --- CURRENCY FORMATTER ---
     const formatCurrency = (val: bigint | undefined) => {
         if (!val) return "0";
-        // If huge (Wei), convert to Ether. If small (Legacy), keep as is.
         if (val > 1_000_000_000n) return toEther(val);
         return val.toString();
     };
@@ -67,12 +101,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     const displayBalance = formatCurrency(balance);
     const displayGoal = formatCurrency(goal);
 
-    // Calculate Percentage
     const percentage = goal && balance 
         ? (Number(displayBalance) / Number(displayGoal)) * 100 
         : 0;
 
-    // --- 2. DATE & DEADLINE ---
     const deadlineDate = deadline ? new Date(Number(deadline) * 1000) : null;
     const isExpired = deadlineDate ? new Date() > deadlineDate : false;
     const daysLeft = deadlineDate 
@@ -86,23 +118,25 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     return (
         <div className="flex flex-col justify-between max-w-sm bg-white border border-slate-200 rounded-lg shadow relative h-full hover:shadow-lg transition-shadow overflow-hidden group">
             
-            {/* --- 3. IMAGE HEADER --- */}
+            {/* --- IMAGE HEADER --- */}
             <div className="h-48 w-full bg-slate-100 relative">
-                 {imageUrl ? (
+                 {finalImageUrl ? (
                      <img 
-                        src={imageUrl} 
-                        alt="Campaign" 
+                        src={finalImageUrl} 
+                        alt={campaignName || "Campaign"} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                      />
                  ) : (
-                     <div className="flex items-center justify-center h-full text-slate-400 text-sm font-mono">
-                        No Image
+                     <div className="flex items-center justify-center h-full text-slate-400 text-sm font-mono flex-col gap-2">
+                        {/* Placeholder Icon */}
+                        <svg className="w-10 h-10 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <span>No Image</span>
                      </div>
                  )}
                  
                  {/* Emergency Badge */}
-                 {isEmergency && (
-                    <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-full shadow-lg animate-pulse flex items-center gap-1 z-10">
+                 {finalIsEmergency && (
+                    <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded-full shadow-lg flex items-center gap-1 z-10">
                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
                          <span className="text-xs font-bold uppercase tracking-wider">Emergency</span>
                     </div>
@@ -113,8 +147,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 {!isLoadingBalance && (
                     <div className="mb-4">
                         <div className="flex justify-between text-xs mb-1.5 font-bold text-slate-600">
-                            <span>Raised: {displayBalance} POL</span>
-                            <span>Goal: {displayGoal} POL</span>
+                            <span>Raised: ₱{displayBalance} </span>
+                            <span>Goal: ₱{displayGoal} </span>
                         </div>
                         <div className="relative w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-600 rounded-full transition-all duration-1000" style={{ width: `${percentage > 100 ? 100 : percentage}%`}}></div>
@@ -125,7 +159,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                     </div>
                 )}
                 
-                <h5 className="mb-2 text-xl font-bold tracking-tight text-slate-900 line-clamp-1">{campaignName}</h5>
+                <h5 className="mb-2 text-xl font-bold tracking-tight text-slate-900 line-clamp-1">{campaignName || "Loading..."}</h5>
                 
                 <div className="flex items-center gap-2 mb-3 text-xs text-slate-500">
                     <span className="bg-slate-100 px-2 py-1 rounded">{formattedDate}</span>
@@ -142,7 +176,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
                 
                 <Link href={`/campaign/${campaignAddress}`} passHref={true} className="mt-auto">
                     <button className="w-full px-4 py-2.5 text-sm font-bold text-center text-white bg-blue-700 rounded-lg hover:bg-slate-600 transition-colors shadow-sm">
-                        View
+                        View Details
                     </button>
                 </Link>
             </div>

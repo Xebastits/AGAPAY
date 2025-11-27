@@ -2,7 +2,8 @@
 import { useReadContract } from "thirdweb/react";
 import { client } from "@/app/client";
 import { getContract } from "thirdweb";
-import { CampaignCard } from "@/app/components/CampaignCard";
+// Make sure path is correct
+import { CampaignCard } from "../components/CampaignCard"; 
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import { polygonAmoy } from "thirdweb/chains";
 import { useState, useEffect, useMemo } from "react";
@@ -12,7 +13,6 @@ type CampaignData = {
   owner: string;
   name: string;
   creationTime: bigint;
-  
 };
 
 export default function CampaignsPage() {
@@ -33,10 +33,8 @@ export default function CampaignsPage() {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
   const [selectedYear, setSelectedYear] = useState<string>('all');
   
-  // Pagination State
-  const [visibleCount, setVisibleCount] = useState(6); // Default show 6
+  const [visibleCount, setVisibleCount] = useState(6); 
 
-  // Reset pagination when ANY filter changes
   useEffect(() => {
     setVisibleCount(6);
   }, [showEmergencyFirst, selectedFilter, selectedYear]);
@@ -71,10 +69,13 @@ export default function CampaignsPage() {
     // 3. Emergency Sort (Priority)
     if (showEmergencyFirst) {
       result.sort((a, b) => {
+        // Note: This matches "Emergency" in the name. 
+        // Real-time firebase fetching for sorting is expensive, 
+        // so this name-check is a good compromise for the list view.
         const aIsEmergency = a.name.toLowerCase().includes('emergency');
         const bIsEmergency = b.name.toLowerCase().includes('emergency');
-        if (aIsEmergency && !bIsEmergency) return -1; // a goes first
-        if (!aIsEmergency && bIsEmergency) return 1;  // b goes first
+        if (aIsEmergency && !bIsEmergency) return -1; 
+        if (!aIsEmergency && bIsEmergency) return 1;  
         return 0;
       });
     }
@@ -82,10 +83,8 @@ export default function CampaignsPage() {
     return result;
   }, [campaigns, selectedYear, showEmergencyFirst]);
 
-  // Pagination Slice
   const visibleCampaigns = processedCampaigns.slice(0, visibleCount);
 
-  // Helper for Years dropdown
   const availableYears = useMemo(() => {
     if (!campaigns) return [];
     const years = new Set(campaigns.map(c => new Date(Number(c.creationTime) * 1000).getUTCFullYear()));
@@ -137,7 +136,7 @@ export default function CampaignsPage() {
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              {showEmergencyFirst ? 'Emergency First: ON' : 'Emergency First: OFF'}
+              {showEmergencyFirst ? 'EMERGENCY' : 'EMERGENCY'}
             </button>
           </div>
         </div>
@@ -149,7 +148,7 @@ export default function CampaignsPage() {
               <CampaignWithStatus
                 key={campaign.campaignAddress}
                 campaignAddress={campaign.campaignAddress}
-                selectedFilter={selectedFilter} // Only pass filter logic down
+                selectedFilter={selectedFilter} 
                 creationTime={campaign.creationTime}
               />
             ))
@@ -178,7 +177,7 @@ export default function CampaignsPage() {
   );
 }
 
-// Helper Component to Fetch Individual Contract Status
+// Helper Component
 const CampaignWithStatus = ({ campaignAddress, selectedFilter, creationTime }: any) => {
   const contract = getContract({
     client: client,
@@ -196,5 +195,6 @@ const CampaignWithStatus = ({ campaignAddress, selectedFilter, creationTime }: a
 
   if (selectedFilter !== 'all' && statusString !== selectedFilter) return null;
 
+  // We don't pass ImageUrl here, because the Card fetches it internally!
   return <CampaignCard campaignAddress={campaignAddress} creationTime={creationTime} />;
 };
