@@ -34,7 +34,7 @@ export const MyCampaignCard: React.FC<CampaignCardProps> = ({
     const contract = getContract({
       client: client,
       chain: selectedChain,
-      address: CROWDFUNDING_FACTORY,
+      address: campaignAddress,
     });
 
     const { data: campaignName } = useReadContract({
