@@ -3,10 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
 import Navbar from "./components/Navbar";
-import AuthGuard from "./components/AuthGuard";
-import { NetworkProvider } from "./contexts/NetworkContext";
-
-
+import { NetworkProvider } from './contexts/NetworkContext';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,10 +25,8 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-slate-100 text-slate-700">
         <ThirdwebProvider>
-           <NetworkProvider>
-          {}
-          <AuthGuard /> 
           <Navbar />
+          <NetworkProvider>
           {children}
           </NetworkProvider>
         </ThirdwebProvider>

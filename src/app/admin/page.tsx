@@ -11,7 +11,6 @@ import { useSendTransaction } from "thirdweb/react";
 import { client } from "@/app/client"; 
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import Link from "next/link";
-import { polygonAmoy, sepolia } from "thirdweb/chains";
 import { useNetwork } from '../contexts/NetworkContext';
 
 interface Campaign {
@@ -309,7 +308,7 @@ const { selectedChain, setSelectedChain } = useNetwork();
                                     
                                     <td className="px-6 py-4 font-mono text-xs text-blue-600">
                                         <a 
-                                            href={`https://amoy.polygonscan.com/address/${camp.campaignAddress}`} 
+                                            href={`https://sepolia.etherscan.io/address/${camp.campaignAddress}`} 
                                             target="_blank" 
                                             rel="noopener noreferrer"
                                             className="hover:underline flex items-center gap-1"

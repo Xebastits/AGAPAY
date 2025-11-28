@@ -6,20 +6,18 @@ import { MyCampaignCard } from "../../components/MyCampaignCard";
 import { useState, useEffect } from "react";
 import { getContract } from "thirdweb";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
-import { polygonAmoy, sepolia } from "thirdweb/chains";
 import { useNetwork } from '../../contexts/NetworkContext';
 
-const { selectedChain, setSelectedChain } = useNetwork();
 
 // Imports for Data & Image
-import { db } from "@/app/lib/firebase"; 
+import { db } from "@/app/lib/firebase";
 import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
-import { uploadToCloudinary } from "../../lib/cloudinary"; 
+import { uploadToCloudinary } from "../../lib/cloudinary";
 
 type CampaignRequest = {
     id: string;
-    name: string;      
-    fullName?: string; 
+    name: string;
+    fullName?: string;
     description: string;
     status: string;
     rejectionReason?: string;
@@ -27,7 +25,7 @@ type CampaignRequest = {
 };
 
 export default function DashboardPage() {
-    const { selectedChain, setSelectedChain } = useNetwork();   
+    const { selectedChain, setSelectedChain } = useNetwork();
     const account = useActiveAccount();
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
@@ -83,26 +81,36 @@ export default function DashboardPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {pendingRequests.map((req) => (
-                            <div key={req.id} className="bg-white p-4 rounded shadow-sm border border-gray-200 relative overflow-hidden">
+                            <div
+                                key={req.id}
+                                className="bg-white p-4 pr-6 rounded shadow-sm border border-gray-200 relative break-words"
+                            >
                                 {req.isEmergency && (
                                     <div className="absolute top-0 left-0 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-br">
                                         EMERGENCY
                                     </div>
-                                )}  
+                                )}
                                 <div className="flex justify-between items-start mb-2 mt-2">
-                                    <div>
-                                        <h4 className="font-bold text-lg truncate pr-2">{req.name}</h4>
-                                        {req.fullName && <p className="text-xs text-gray-400">By: {req.fullName}</p>}
+                                    <div className="pr-2">
+                                        <h4 className="font-bold text-lg break-words">{req.name}</h4>
+                                        {req.fullName && (
+                                            <p className="text-xs text-gray-400 break-words">By: {req.fullName}</p>
+                                        )}
                                     </div>
-                                    <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${
-                                        req.status === 'rejected' ? 'bg-red-100 text-red-700' : 
-                                        req.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                        'bg-yellow-100 text-yellow-700'
-                                    }`}>{req.status}</span>
+                                    <span
+                                        className={`text-xs font-bold px-2 py-1 rounded uppercase ${req.status === "rejected"
+                                                ? "bg-red-100 text-red-700"
+                                                : req.status === "approved"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : "bg-yellow-100 text-yellow-700"
+                                            }`}
+                                    >
+                                        {req.status}
+                                    </span>
                                 </div>
-                                <p className="text-sm text-gray-600 line-clamp-2 mb-2">{req.description}</p>
-                                {req.status === 'rejected' && (
-                                    <div className="text-xs text-red-600 bg-red-50 p-2 rounded mt-2">
+                                <p className="text-sm text-gray-600 line-clamp-2 mb-2 break-words">{req.description}</p>
+                                {req.status === "rejected" && (
+                                    <div className="text-xs text-red-600 bg-red-50 p-2 rounded mt-2 break-words">
                                         <strong>Reason:</strong> {req.rejectionReason}
                                     </div>
                                 )}
@@ -114,7 +122,7 @@ export default function DashboardPage() {
 
             {/* ACTIVE CAMPAIGNS SECTION */}
             <div className="flex flex-row justify-between items-center mb-4">
-                <p className="text-2xl font-semibold">Active Blockchain Campaigns:</p>
+                <p className="text-2xl font-semibold">My Campaigns:</p>
                 <div className="flex items-center">
                     <label className="mr-2 text-sm font-medium">Filter:</label>
                     <select
@@ -145,7 +153,7 @@ export default function DashboardPage() {
                     )
                 )}
             </div>
-            
+
             {isModalOpen && (
                 <CreateCampaignModal
                     setIsModalOpen={setIsModalOpen}
@@ -169,14 +177,14 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form State
-    const [fullName, setFullName] = useState(""); 
-    const [name, setName] = useState("");         
-    const [age, setAge] = useState(""); 
+    const [fullName, setFullName] = useState("");
+    const [name, setName] = useState("");
+    const [age, setAge] = useState("");
     const [description, setDescription] = useState("");
     const [goal, setGoal] = useState(1);
     const [deadline, setDeadline] = useState(30);
     const [isEmergency, setIsEmergency] = useState(false);
-    
+
     // File State
     const [campaignImage, setCampaignImage] = useState<File | null>(null);
     const [idImage, setIdImage] = useState<File | null>(null);
@@ -201,21 +209,21 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
             // 3. Save Data
             await addDoc(collection(db, "campaigns"), {
                 creator: account.address,
-                fullName: fullName, 
+                fullName: fullName,
                 name: finalName,    // <--- Sending the Modified Name
                 description: description,
                 age: age,
                 goal: goal,
                 deadline: deadline,
                 isEmergency: isEmergency,
-                imageUrl: campUrl,      
-                idImageUrl: idUrl,      
+                imageUrl: campUrl,
+                idImageUrl: idUrl,
                 status: "pending",
                 createdAt: Date.now()
             });
 
             alert("Request Submitted Successfully!");
-            refreshRequests(); 
+            refreshRequests();
             setIsModalOpen(false);
 
         } catch (error) {
@@ -237,35 +245,35 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
                 <div className="flex flex-col gap-4">
                     {/* Identity Info */}
                     <div className="grid grid-cols-3 gap-4">
-                         <div className="col-span-2">
+                        <div className="col-span-2">
                             <label className="block text-sm font-bold mb-1">User's Legal Name</label>
-                            <input 
-                                value={fullName} 
-                                onChange={(e) => setFullName(e.target.value)} 
-                                className="w-full px-3 py-2 border rounded" 
-                                placeholder="John Doe" 
+                            <input
+                                value={fullName}
+                                onChange={(e) => setFullName(e.target.value)}
+                                className="w-full px-3 py-2 border rounded"
+                                placeholder="John Doe"
                             />
-                         </div>
-                         <div>
+                        </div>
+                        <div>
                             <label className="block text-sm font-bold mb-1">Age</label>
-                            <input 
-                                type="number" 
-                                value={age} 
-                                onChange={(e) => setAge(e.target.value)} 
-                                className="w-full px-3 py-2 border rounded" 
-                                placeholder="18+" 
+                            <input
+                                type="number"
+                                value={age}
+                                onChange={(e) => setAge(e.target.value)}
+                                className="w-full px-3 py-2 border rounded"
+                                placeholder="18+"
                             />
-                         </div>
+                        </div>
                     </div>
 
                     {/* Campaign Info */}
                     <div>
                         <label className="block text-sm font-bold mb-1">Campaign Title</label>
-                        <input 
-                            value={name} 
-                            onChange={(e) => setName(e.target.value)} 
-                            className="w-full px-3 py-2 border rounded" 
-                            placeholder="e.g., Medical Fund for..." 
+                        <input
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full px-3 py-2 border rounded"
+                            placeholder="e.g., Medical Fund for..."
                         />
                     </div>
 
@@ -286,14 +294,13 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
                     </div>
 
                     {/* --- EMERGENCY TOGGLE --- */}
-                    <div 
-                        className={`p-4 rounded border cursor-pointer transition flex items-center gap-3 ${
-                            isEmergency ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200'
-                        }`} 
+                    <div
+                        className={`p-4 rounded border cursor-pointer transition flex items-center gap-3 ${isEmergency ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200'
+                            }`}
                         onClick={() => setIsEmergency(!isEmergency)}
                     >
-                        <input 
-                            type="checkbox" 
+                        <input
+                            type="checkbox"
                             checked={isEmergency}
                             onChange={(e) => setIsEmergency(e.target.checked)}
                             className="w-5 h-5 text-red-600 rounded focus:ring-red-500 cursor-pointer"
@@ -309,12 +316,12 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
                     {/* IMAGE INPUTS */}
                     <div className="border-t pt-4 mt-2">
                         <label className="block text-sm font-bold text-blue-800 mb-2">1. Campaign Cover Image</label>
-                        <input type="file" accept="image/*" onChange={(e) => setCampaignImage(e.target.files?.[0] || null)} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                        <input type="file" accept="image/*" onChange={(e) => setCampaignImage(e.target.files?.[0] || null)} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
                     </div>
 
                     <div className="border-t pt-4 mt-2 bg-yellow-50 p-3 rounded">
                         <label className="block text-sm font-bold text-yellow-800 mb-2">2. ID Verification (Required)</label>
-                        <input type="file" accept="image/*" onChange={(e) => setIdImage(e.target.files?.[0] || null)} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-100 file:text-yellow-700 hover:file:bg-yellow-200"/>
+                        <input type="file" accept="image/*" onChange={(e) => setIdImage(e.target.files?.[0] || null)} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-100 file:text-yellow-700 hover:file:bg-yellow-200" />
                     </div>
 
                     <button
@@ -337,6 +344,7 @@ type CampaignWithStatusProps = {
 };
 
 const CampaignWithStatus: React.FC<CampaignWithStatusProps> = ({ contractAddress, selectedFilter }) => {
+    const { selectedChain, setSelectedChain } = useNetwork();
     const contract = getContract({
         client: client,
         chain: selectedChain,
@@ -355,5 +363,5 @@ const CampaignWithStatus: React.FC<CampaignWithStatusProps> = ({ contractAddress
         return null;
     }
 
-    return <MyCampaignCard contractAddress={contractAddress} />;
+    return <MyCampaignCard campaignAddress={contractAddress} />;
 };
