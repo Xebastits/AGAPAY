@@ -4,7 +4,7 @@ import { client } from "@/app/client";
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import { MyCampaignCard } from "../../components/MyCampaignCard";
 import { useState, useEffect } from "react";
-import { getContract } from "thirdweb";
+import { getContract, toWei } from "thirdweb";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
 import { useNetwork } from '../../contexts/NetworkContext';
 
@@ -181,7 +181,7 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
     const [name, setName] = useState("");
     const [age, setAge] = useState("");
     const [description, setDescription] = useState("");
-    const [goal, setGoal] = useState(1);
+    const [goal, setGoal] = useState("1"); // ETH as string
     const [deadline, setDeadline] = useState(30);
     const [isEmergency, setIsEmergency] = useState(false);
 
@@ -284,8 +284,14 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-bold mb-1">Goal (₱)</label>
-                            <input type="number" value={goal} onChange={(e) => setGoal(Number(e.target.value))} className="w-full px-3 py-2 border rounded" />
+                            <label className="block text-sm font-bold mb-1">Goal (ETH)</label>
+                            <input
+                                type="text"
+                                value={goal}
+                                onChange={(e) => setGoal(e.target.value)}
+                                className="w-full px-3 py-2 border rounded"
+                                placeholder="e.g., 1.5"
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-bold mb-1">Duration (Days)</label>
