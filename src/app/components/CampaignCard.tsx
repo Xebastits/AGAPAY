@@ -1,7 +1,7 @@
 import { client } from "@/app/client";
 import Link from "next/link";
 import { getContract, toEther } from "thirdweb"; 
-import { polygonAmoy } from "thirdweb/chains";
+import { sepolia } from "thirdweb/chains";
 import { useReadContract } from "thirdweb/react";
 import { useState, useEffect } from "react";
 
@@ -27,7 +27,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
 
     const contract = getContract({
         client: client,
-        chain: polygonAmoy,
+        chain: sepolia,
         address: campaignAddress,
     });
 

@@ -3,25 +3,24 @@ import { client } from "@/app/client";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { getContract, prepareContractCall, toEther, toWei } from "thirdweb";
-import { lightTheme, TransactionButton, useActiveAccount, useReadContract } from "thirdweb/react";
-import { polygonAmoy, sepolia } from "thirdweb/chains";
+// CHANGED: Added useSendTransaction to imports
+import { lightTheme, TransactionButton, useActiveAccount, useReadContract, useSendTransaction } from "thirdweb/react";
 import { useNetwork } from '../../contexts/NetworkContext';
 
-
 // --- FIREBASE IMPORTS ---
-import { db } from "@/app/lib/firebase"; 
+import { db } from "@/app/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
-
 
 export default function CampaignPage() {
 
-    const { selectedChain, setSelectedChain } = useNetwork();
+    const { selectedChain } = useNetwork();
     const account = useActiveAccount();
     const { campaignAddress } = useParams();
     const [donationAmount, setDonationAmount] = useState<string>("");
-    
-    // --- State for Image ---
     const [imageUrl, setImageUrl] = useState<string>("");
+
+    // --- NEW: Custom Transaction Hook (Instant Wallet Open) ---
+    const { mutate: sendTransaction, isPending: isDonating } = useSendTransaction();
 
     const contract = getContract({
         client: client,
@@ -115,17 +114,54 @@ export default function CampaignPage() {
         return "Unknown";
     };
 
+    // --- NEW: Handle Donation Function ---
+    const handleDonate = () => {
+        if (!donationAmount) return;
+
+        // 1. Validate Minimum Contribution (0.0001 ETH)
+        // Your contract enforces this, so we block it here to prevent error logs
+        if (parseFloat(donationAmount) < 0.0001) {
+            alert("Minimum donation is 0.0001 ETH (Contract Limit)");
+            return;
+        }
+
+        try {
+            // 2. Prepare Transaction
+            const transaction = prepareContractCall({
+                contract: contract,
+                method: "function donate()",
+                params: [],
+                value: toWei(donationAmount)
+            });
+
+            // 3. Send Immediately (Skips Thirdweb Modal)
+            sendTransaction(transaction, {
+                onSuccess: () => {
+                    alert("Donation successful!");
+                    setDonationAmount("");
+                },
+                onError: (error) => {
+                    console.error("Donation Error:", error);
+                    // Detailed error message if available
+                    alert(`Transaction Failed. Please ensure you have enough funds.`);
+                }
+            });
+        } catch (error) {
+            console.error("Preparation Error:", error);
+        }
+    };
+
     return (
-<div className="mx-auto max-w-7xl px-4 mt-8 sm:px-6 lg:px-8 pb-20">
+        <div className="mx-auto max-w-7xl px-4 mt-8 sm:px-6 lg:px-8 pb-20">
             
-            {}
+            {/* HERO IMAGE */}
             <div className="max-w-2xl mx-auto h-56 md:h-80 bg-slate-100 rounded-xl overflow-hidden mb-8 shadow-sm relative">
-                                {imageUrl ? (
-                                    <img 
-                                        src={imageUrl} 
-                                        alt={name || "Campaign Cover"} 
-                                        className="w-full h-full object-cover"
-                                    />
+                {imageUrl ? (
+                    <img 
+                        src={imageUrl} 
+                        alt={name || "Campaign Cover"} 
+                        className="w-full h-full object-cover"
+                    />
                 ) : (
                     <div className="flex items-center justify-center h-full text-slate-400 flex-col gap-2">
                          <svg className="w-16 h-16 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -158,7 +194,7 @@ export default function CampaignPage() {
                     )}
                 </div>
 
-                {/* OWNER ACTIONS */}
+                {/* OWNER ACTIONS (Keep TransactionButton here for Owner) */}
                 {owner === account?.address && (
                     <div className="flex gap-2">
                          {status === 1 && (
@@ -195,7 +231,6 @@ export default function CampaignPage() {
                     {/* PROGRESS CARD */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                         <div className="mb-4">
-                            {/* UPDATED: Currency Symbol to ₱ */}
                             <p className="text-4xl font-extrabold text-blue-600">₱ {formatCurrency(balance)}</p>
                             <p className="text-sm text-slate-500 font-medium mt-1">
                                 raised of <span className="text-slate-800 font-bold">₱ {formatCurrency(goal)}</span> goal
@@ -220,7 +255,7 @@ export default function CampaignPage() {
                         </div>
                     </div>
 
-                    {/* DONATION CARD */}
+                    {/* DONATION CARD - UPDATED FOR INSTANT CLICK */}
                     {status === 0 && !hasDeadlinePassed && (
                         <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 shadow-sm">
                             <h3 className="text-lg font-bold text-blue-900 mb-4">Make a Contribution</h3>
@@ -228,36 +263,29 @@ export default function CampaignPage() {
                             <div className="space-y-4">
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        {/* UPDATED: Input Icon to ₱ */}
                                         <span className="text-blue-500 font-bold text-xl">₱</span>
                                     </div>
                                     <input 
                                         type="number" 
                                         value={donationAmount}
                                         onChange={(e) => setDonationAmount(e.target.value)}
-                                        placeholder="Amount"
+                                        placeholder="Amount (Min 0.0001)"
                                         className="pl-10 pr-4 py-3 w-full border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg font-semibold text-slate-700"
                                     />
                                 </div>
                                 
-                                <TransactionButton
-                                    transaction={() => prepareContractCall({
-                                        contract: contract,
-                                        method: "function donate()",
-                                        params: [],
-                                        value: toWei(donationAmount || "0")
-                                    })}
-                                    onTransactionConfirmed={() => {
-                                        alert("Donation successful!");
-                                        setDonationAmount("");
-                                    }}
-                                    onError={(error) => alert(`Error: ${error.message}`)}
-                                    theme={lightTheme()}
-                                    disabled={!donationAmount || parseFloat(donationAmount) <= 0}
-                                    className="!w-full !py-4 !text-lg !font-bold !rounded-lg"
+                                {/* REPLACED: TransactionButton with Standard Button + Hook */}
+                                <button
+                                    onClick={handleDonate}
+                                    disabled={isDonating || !donationAmount}
+                                    className={`w-full py-4 text-lg font-bold rounded-lg transition-all duration-200 shadow-md ${
+                                        isDonating || !donationAmount 
+                                        ? "bg-blue-300 cursor-not-allowed text-blue-50" 
+                                        : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-[0.98]"
+                                    }`}
                                 >
-                                    Donate Now
-                                </TransactionButton>
+                                    {isDonating ? "Opening Wallet..." : "Donate Now"}
+                                </button>
                             </div>
                             <p className="text-xs text-blue-400 mt-3 text-center">
                                 Secure transaction on Blockchain
@@ -265,7 +293,7 @@ export default function CampaignPage() {
                         </div>
                     )}
 
-                    {/* REFUND ACTION */}
+                    {/* REFUND ACTION (Keep TransactionButton here for Refunds) */}
                     {status === 2 && (
                         <div className="bg-red-50 p-6 rounded-lg border border-red-100 text-center shadow-sm">
                             <h3 className="text-lg font-bold text-red-800 mb-2">Campaign Failed</h3>
