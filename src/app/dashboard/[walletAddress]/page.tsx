@@ -3,6 +3,7 @@
 import { client } from "@/app/client";
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import { MyCampaignCard } from "../../components/MyCampaignCard";
+import RejectionGuidanceModal from "../../components/RejectionGuidanceModal";
 import { useState, useEffect } from "react";
 import { getContract, toWei } from "thirdweb";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
@@ -28,6 +29,8 @@ export default function DashboardPage() {
     const { selectedChain, setSelectedChain } = useNetwork();
     const account = useActiveAccount();
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+    const [isRejectionModalOpen, setIsRejectionModalOpen] = useState<boolean>(false);
+    const [selectedRejectedRequest, setSelectedRejectedRequest] = useState<CampaignRequest | null>(null);
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
     const [pendingRequests, setPendingRequests] = useState<CampaignRequest[]>([]);
 
@@ -81,10 +84,19 @@ export default function DashboardPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {pendingRequests.map((req) => (
-                            <div
-                                key={req.id}
-                                className="bg-white p-4 pr-6 rounded shadow-sm border border-gray-200 relative break-words"
-                            >
+<div
+    key={req.id}
+    className={`bg-white p-4 pr-6 rounded shadow-sm border border-gray-200 
+    relative break-words 
+    ${req.status === "rejected" ? "cursor-pointer hover:shadow-md transition" : ""}`}
+    onClick={() => {
+        if (req.status === "rejected") {
+            setSelectedRejectedRequest(req);
+            setIsRejectionModalOpen(true);
+        }
+    }}
+>
+
                                 {req.isEmergency && (
                                     <div className="absolute top-0 left-0 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-br">
                                         EMERGENCY
@@ -160,6 +172,17 @@ export default function DashboardPage() {
                     refreshRequests={fetchPendingRequests}
                 />
             )}
+
+<RejectionGuidanceModal
+    isOpen={isRejectionModalOpen}
+    onClose={() => {
+        setIsRejectionModalOpen(false);
+        setSelectedRejectedRequest(null);
+    }}
+    request={selectedRejectedRequest}
+    openCreateModal={() => setIsModalOpen(true)}
+/>
+
         </div>
     );
 }

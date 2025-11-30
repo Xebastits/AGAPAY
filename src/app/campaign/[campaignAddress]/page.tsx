@@ -3,9 +3,9 @@ import { client } from "@/app/client";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { getContract, prepareContractCall, toEther, toWei } from "thirdweb";
-import { 
-    lightTheme, 
-    useActiveAccount, 
+import {
+    lightTheme,
+    useActiveAccount,
     useReadContract,
     useActiveWalletChain,
     useSwitchActiveWalletChain,
@@ -29,15 +29,16 @@ const wallets = [
     createWallet("com.coinbase.wallet"),
 ];
 
+
 export default function CampaignPage() {
     const { selectedChain } = useNetwork();
     const account = useActiveAccount();
     const activeChain = useActiveWalletChain();
     const switchChain = useSwitchActiveWalletChain();
     const { campaignAddress } = useParams();
-    
     const [donationAmount, setDonationAmount] = useState<string>("");
     const [imageUrl, setImageUrl] = useState<string>("");
+    const [creatorFullName, setCreatorFullName] = useState<string>("");
     const [isDonating, setIsDonating] = useState(false);
     const [txHash, setTxHash] = useState<string | null>(null);
 
@@ -59,7 +60,7 @@ export default function CampaignPage() {
     };
 
     const clearToast = () => setToast(null);
-
+    
     // --- HELPER: Format Currency ---
     const formatCurrency = (val: bigint | undefined) => {
         if (!val) return "0";
@@ -73,27 +74,29 @@ export default function CampaignPage() {
         params: [],
     });
 
-    // --- Fetch Image from Firebase ---
+    // --- Fetch Image and Creator Name from Firebase ---
     useEffect(() => {
-        const fetchImage = async () => {
+        const fetchMetadata = async () => {
             if (!name) return;
             try {
                 const q = query(collection(db, "campaigns"), where("name", "==", name));
                 const snapshot = await getDocs(q);
                 if (!snapshot.empty) {
-                    setImageUrl(snapshot.docs[0].data().imageUrl);
+                    const data = snapshot.docs[0].data();
+                    setImageUrl(data.imageUrl);
+                    setCreatorFullName(data.fullName || "");
                 }
             } catch (err) {
-                console.error("Error fetching image:", err);
+                console.error("Error fetching metadata:", err);
             }
         };
-        fetchImage();
+        fetchMetadata();
     }, [name]);
 
-    const { data: description, isLoading: isLoadingDescription } = useReadContract({ 
-        contract, 
-        method: "function description() view returns (string)", 
-        params: [] 
+    const { data: description, isLoading: isLoadingDescription } = useReadContract({
+        contract,
+        method: "function description() view returns (string)",
+        params: []
     });
 
     const { data: deadline, isLoading: isLoadingDeadline } = useReadContract({
@@ -127,10 +130,10 @@ export default function CampaignPage() {
         params: [],
     });
 
-    const { data: status, isLoading: isLoadingStatus } = useReadContract({ 
-        contract, 
-        method: "function state() view returns (uint8)", 
-        params: [] 
+    const { data: status, isLoading: isLoadingStatus } = useReadContract({
+        contract,
+        method: "function state() view returns (uint8)",
+        params: []
     });
 
     const getStatusText = (s: number | undefined) => {
@@ -143,7 +146,7 @@ export default function CampaignPage() {
     // --- INSTANT DONATION - Direct sendTransaction ---
     const handleDonate = async () => {
         const amount = parseFloat(donationAmount);
-        
+
         // Validation
         if (!amount || amount < 0.0001) {
             showToast("Minimum donation is 0.0001 ETH", 'error');
@@ -187,13 +190,13 @@ export default function CampaignPage() {
             setTxHash(result.transactionHash);
             showToast(`🎉 Donation sent! TX: ${result.transactionHash.slice(0, 10)}...`, 'success', 6000);
             setDonationAmount("");
-            
+
             // Refetch balance after a delay
             setTimeout(() => refetchBalance(), 3000);
 
         } catch (error: any) {
             console.error("Donation Error:", error);
-            
+
             // Handle specific errors
             if (error?.message?.includes("rejected") || error?.message?.includes("denied")) {
                 showToast("Transaction cancelled by user", 'info');
@@ -211,7 +214,7 @@ export default function CampaignPage() {
     // --- INSTANT WITHDRAW ---
     const handleWithdraw = async () => {
         if (!account) return;
-        
+
         setIsDonating(true);
         showToast("⏳ Confirm withdrawal in wallet...", 'pending');
 
@@ -242,7 +245,7 @@ export default function CampaignPage() {
     // --- INSTANT REFUND ---
     const handleRefund = async () => {
         if (!account) return;
-        
+
         setIsDonating(true);
         showToast("⏳ Confirm refund in wallet...", 'pending');
 
@@ -274,19 +277,18 @@ export default function CampaignPage() {
 
     return (
         <div className="mx-auto max-w-7xl px-4 mt-8 sm:px-6 lg:px-8 pb-20">
-            
+
             {/* TOAST NOTIFICATION */}
             {toast && (
-                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl animate-slideIn flex items-center gap-3 ${
-                    toast.type === 'success' ? 'bg-green-500 text-white' :
-                    toast.type === 'error' ? 'bg-red-500 text-white' :
-                    toast.type === 'pending' ? 'bg-yellow-500 text-white' :
-                    'bg-blue-500 text-white'
-                }`}>
+                <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl animate-slideIn flex items-center gap-3 ${toast.type === 'success' ? 'bg-green-500 text-white' :
+                        toast.type === 'error' ? 'bg-red-500 text-white' :
+                            toast.type === 'pending' ? 'bg-yellow-500 text-white' :
+                                'bg-blue-500 text-white'
+                    }`}>
                     {toast.type === 'pending' && (
                         <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
                     )}
                     <p className="font-semibold">{toast.message}</p>
@@ -296,9 +298,9 @@ export default function CampaignPage() {
             {/* HERO IMAGE */}
             <div className="max-w-2xl mx-auto h-56 md:h-80 bg-slate-100 rounded-xl overflow-hidden mb-8 shadow-sm relative">
                 {imageUrl ? (
-                    <img 
-                        src={imageUrl} 
-                        alt={name || "Campaign Cover"} 
+                    <img
+                        src={imageUrl}
+                        alt={name || "Campaign Cover"}
                         className="w-full h-full object-cover"
                     />
                 ) : (
@@ -309,15 +311,14 @@ export default function CampaignPage() {
                         <span className="font-semibold opacity-50">No Cover Image</span>
                     </div>
                 )}
-                
+
                 {/* Status Badge */}
                 {!isLoadingStatus && (
                     <div className="absolute top-4 right-4">
-                        <span className={`px-4 py-2 text-sm font-bold rounded-full shadow-md uppercase tracking-wide ${
-                            status === 0 ? "bg-green-500 text-white" :
-                            status === 1 ? "bg-blue-600 text-white" :
-                            "bg-red-600 text-white"
-                        }`}>
+                        <span className={`px-4 py-2 text-sm font-bold rounded-full shadow-md uppercase tracking-wide ${status === 0 ? "bg-green-500 text-white" :
+                                status === 1 ? "bg-blue-600 text-white" :
+                                    "bg-red-600 text-white"
+                            }`}>
                             {getStatusText(status)}
                         </span>
                     </div>
@@ -328,9 +329,11 @@ export default function CampaignPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     {!isLoadingName && <h1 className="text-4xl font-bold text-slate-900">{name}</h1>}
+                    <h1 className="text-xl font text-slate-900"> Creator: {creatorFullName}</h1>
                     {owner && (
                         <p className="text-sm text-slate-400 mt-1 font-mono truncate max-w-xs">
-                            Creator: {owner.slice(0, 6)}...{owner.slice(-4)}
+                            ${owner.slice(0, 6)}...${owner.slice(-4)}<br/>
+        
                         </p>
                     )}
                 </div>
@@ -362,7 +365,7 @@ export default function CampaignPage() {
                         <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4">
                             <p className="text-sm text-green-800">
                                 <strong>Last Transaction:</strong>{" "}
-                                <a 
+                                <a
                                     href={`${selectedChain.blockExplorers?.[0]?.url}/tx/${txHash}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -377,7 +380,7 @@ export default function CampaignPage() {
 
                 {/* RIGHT COLUMN: Stats & Donation */}
                 <div className="flex flex-col gap-6">
-                    
+
                     {/* PROGRESS CARD */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                         <div className="mb-4">
@@ -390,9 +393,9 @@ export default function CampaignPage() {
                         </div>
 
                         <div className="relative w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-2">
-                            <div 
-                                className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out" 
-                                style={{ width: `${balancePercentage}%`}}
+                            <div
+                                className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out"
+                                style={{ width: `${balancePercentage}%` }}
                             />
                         </div>
                         <div className="flex justify-between text-xs text-slate-500 font-bold">
@@ -411,7 +414,7 @@ export default function CampaignPage() {
                     {status === 0 && !hasDeadlinePassed && (
                         <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 shadow-sm">
                             <h3 className="text-lg font-bold text-blue-900 mb-4">⚡ Quick Donate</h3>
-                            
+
                             {!account ? (
                                 <div className="text-center py-4">
                                     <p className="text-sm text-slate-600 mb-4">Connect wallet to donate</p>
@@ -431,11 +434,10 @@ export default function CampaignPage() {
                                                 key={amt}
                                                 onClick={() => setDonationAmount(amt)}
                                                 disabled={isDonating}
-                                                className={`px-3 py-2 text-xs font-bold border-2 rounded-lg transition-all active:scale-95 ${
-                                                    donationAmount === amt 
-                                                    ? 'bg-blue-600 border-blue-600 text-white' 
-                                                    : 'bg-white border-blue-200 hover:border-blue-500 hover:bg-blue-50'
-                                                } disabled:opacity-50`}
+                                                className={`px-3 py-2 text-xs font-bold border-2 rounded-lg transition-all active:scale-95 ${donationAmount === amt
+                                                        ? 'bg-blue-600 border-blue-600 text-white'
+                                                        : 'bg-white border-blue-200 hover:border-blue-500 hover:bg-blue-50'
+                                                    } disabled:opacity-50`}
                                             >
                                                 {amt}
                                             </button>
@@ -443,8 +445,8 @@ export default function CampaignPage() {
                                     </div>
 
                                     <div className="relative">
-                                        <input 
-                                            type="number" 
+                                        <input
+                                            type="number"
                                             value={donationAmount}
                                             onChange={(e) => setDonationAmount(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && !isDonating && handleDonate()}
@@ -458,22 +460,21 @@ export default function CampaignPage() {
                                             ETH
                                         </span>
                                     </div>
-                                    
+
                                     {/* INSTANT DONATE BUTTON */}
                                     <button
                                         onClick={handleDonate}
                                         disabled={isDonating || !donationAmount || parseFloat(donationAmount) < 0.0001}
-                                        className={`w-full py-4 text-lg font-bold rounded-lg transition-all duration-150 shadow-md ${
-                                            isDonating || !donationAmount || parseFloat(donationAmount) < 0.0001
-                                            ? "bg-blue-300 cursor-not-allowed text-blue-50" 
-                                            : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-[0.98]"
-                                        }`}
+                                        className={`w-full py-4 text-lg font-bold rounded-lg transition-all duration-150 shadow-md ${isDonating || !donationAmount || parseFloat(donationAmount) < 0.0001
+                                                ? "bg-blue-300 cursor-not-allowed text-blue-50"
+                                                : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-[0.98]"
+                                            }`}
                                     >
                                         {isDonating ? (
                                             <span className="flex items-center justify-center gap-2">
                                                 <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                                 </svg>
                                                 Waiting for Wallet...
                                             </span>
@@ -500,11 +501,10 @@ export default function CampaignPage() {
                             <button
                                 onClick={handleRefund}
                                 disabled={isDonating || !account}
-                                className={`w-full py-3 font-bold rounded-lg transition-all ${
-                                    isDonating || !account
-                                    ? "bg-red-300 cursor-not-allowed text-red-50"
-                                    : "bg-red-600 hover:bg-red-700 text-white"
-                                }`}
+                                className={`w-full py-3 font-bold rounded-lg transition-all ${isDonating || !account
+                                        ? "bg-red-300 cursor-not-allowed text-red-50"
+                                        : "bg-red-600 hover:bg-red-700 text-white"
+                                    }`}
                             >
                                 {isDonating ? "Processing..." : "⚡ Claim Refund"}
                             </button>
