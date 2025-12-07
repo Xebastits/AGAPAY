@@ -158,8 +158,8 @@ export const MyCampaignCard: React.FC<CampaignCardProps> = ({
                 {!isLoadingBalance && (
                     <div className="mb-4">
                         <div className="flex justify-between text-xs mb-1.5 font-bold text-slate-600">
-                            <span>Raised: {displayBalance} ₱</span>
-                            <span>Goal: {displayGoal} ₱</span>
+                            <span>Raised: {displayBalance} PHP</span>
+                            <span>Goal: {displayGoal} PHP</span>
                         </div>
                         <div className="relative w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-600 rounded-full transition-all duration-1000" style={{ width: `${percentage > 100 ? 100 : percentage}%`}}></div>

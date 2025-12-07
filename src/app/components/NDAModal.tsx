@@ -25,9 +25,11 @@ export default function NDAModal({ isOpen, onAccept }: NDAModalProps) {
           </p>
 
           <ul className="list-disc list-inside space-y-2">
-            <li>You will not disclose any sensitive information shared on this platform.</li>
-            <li>You will use the information solely for the purpose of supporting legitimate crowdfunding campaigns.</li>
-            <li>You acknowledge that violation of this agreement may result in legal action.</li>
+            <li>We will not disclose any sensitive information shared on this platform.</li>
+            <li>We will use the information solely for the purpose of supporting legitimate crowdfunding campaigns.</li>
+            <li>We acknowledge that violation of this agreement may result in legal action.</li>
+            <li>You will not perform fraudulent campaigns and activiies.</li>
+            <li>You will not request financial aid under false identities.</li>
             <li>This agreement is binding and enforceable under applicable laws.</li>
           </ul>
         </div>

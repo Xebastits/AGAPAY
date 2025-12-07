@@ -2,7 +2,7 @@
 import { client } from "@/app/client";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { getContract, prepareContractCall, toEther, toWei } from "thirdweb";
+import { getContract, prepareContractCall } from "thirdweb";
 import {
     lightTheme,
     useActiveAccount,
@@ -64,7 +64,7 @@ export default function CampaignPage() {
     // --- HELPER: Format Currency ---
     const formatCurrency = (val: bigint | undefined) => {
         if (!val) return "0";
-        return toEther(val);
+        return val.toString();
     };
 
     // Contract reads
@@ -143,13 +143,11 @@ export default function CampaignPage() {
         return "Unknown";
     };
 
-    // --- INSTANT DONATION - Direct sendTransaction ---
+// --- INSTANT DONATION - Direct sendTransaction ---
     const handleDonate = async () => {
-        const amount = parseFloat(donationAmount);
-
-        // Validation
-        if (!amount || amount < 0.0001) {
-            showToast("Minimum donation is 0.0001 ETH", 'error');
+        // 1. STRICT VALIDATION: Ensure string is a valid integer (No decimals)
+        if (!donationAmount || donationAmount.includes(".") || parseInt(donationAmount) < 1) {
+            showToast("Invalid amount. Please enter a whole number (e.g., 100).", 'error');
             return;
         }
 
@@ -173,15 +171,42 @@ export default function CampaignPage() {
         showToast("⏳ Confirm in your wallet...", 'pending');
 
         try {
-            // Prepare the transaction
+            // --- LOGIC: AUTO-ADJUST AMOUNT ---
+            let valueInWei = BigInt(donationAmount);
+
+            // Ensure goal and balance data is available
+            if (goal && balance) {
+                const remaining = goal - balance; // BigInt math
+                
+                // If the user tries to donate more than needed
+                if (valueInWei > remaining) {
+                    // 1. Adjust the value to exactly what's left
+                    valueInWei = remaining;
+                    
+                    // 2. Update the UI input so the user sees the change
+                    setDonationAmount(remaining.toString());
+
+                    // 3. Notify the user
+                    showToast(`⚠️ Amount auto-adjusted to ₱${remaining} to exactly hit the goal.`, 'info', 5000);
+                    
+                    // Edge Case: If the campaign is already full (remaining <= 0)
+                    if (remaining <= 0n) {
+                        showToast("🎉 Campaign goal already reached!", 'success');
+                        setIsDonating(false);
+                        return;
+                    }
+                }
+            }
+
+            // Prepare the transaction with the (potentially adjusted) value
             const transaction = prepareContractCall({
                 contract: contract,
                 method: "function donate()",
                 params: [],
-                value: toWei(donationAmount),
+                value: valueInWei, // Uses the adjusted amount
             });
 
-            // DIRECT SEND - No modal, instant wallet popup
+            // DIRECT SEND
             const result = await sendTransaction({
                 transaction,
                 account,
@@ -189,15 +214,15 @@ export default function CampaignPage() {
 
             setTxHash(result.transactionHash);
             showToast(`🎉 Donation sent! TX: ${result.transactionHash.slice(0, 10)}...`, 'success', 6000);
+            
+            // Clear input only if fully successful
             setDonationAmount("");
 
-            // Refetch balance after a delay
             setTimeout(() => refetchBalance(), 3000);
 
         } catch (error: any) {
             console.error("Donation Error:", error);
 
-            // Handle specific errors
             if (error?.message?.includes("rejected") || error?.message?.includes("denied")) {
                 showToast("Transaction cancelled by user", 'info');
             } else if (error?.message?.includes("insufficient")) {
@@ -230,7 +255,7 @@ export default function CampaignPage() {
                 account,
             });
 
-            showToast(`✅ Withdrawal successful! TX: ${result.transactionHash.slice(0, 10)}...`, 'success', 6000);
+            showToast(`Withdrawal successful! TX: ${result.transactionHash.slice(0, 10)}...`, 'success', 6000);
             setTimeout(() => refetchBalance(), 3000);
 
         } catch (error: any) {
@@ -273,7 +298,7 @@ export default function CampaignPage() {
     };
 
     // --- Quick Preset Amounts ---
-    const presetAmounts = ["0.001", "0.01", "0.1", "1"];
+    const presetAmounts = ["10", "50", "100", "500"];
 
     return (
         <div className="mx-auto max-w-7xl px-4 mt-8 sm:px-6 lg:px-8 pb-20">
@@ -345,7 +370,7 @@ export default function CampaignPage() {
                         disabled={isDonating}
                         className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isDonating ? "Processing..." : "⚡ Withdraw Funds"}
+                        {isDonating ? "Processing..." : "Withdraw Funds"}
                     </button>
                 )}
             </div>
@@ -385,10 +410,10 @@ export default function CampaignPage() {
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                         <div className="mb-4">
                             <p className="text-4xl font-extrabold text-blue-600">
-                                {formatCurrency(balance)} ETH
+                                {formatCurrency(balance)} PHP
                             </p>
                             <p className="text-sm text-slate-500 font-medium mt-1">
-                                raised of <span className="text-slate-800 font-bold">{formatCurrency(goal)} ETH</span> goal
+                                raised of <span className="text-slate-800 font-bold">{formatCurrency(goal)} PHP</span> goal
                             </p>
                         </div>
 
@@ -413,7 +438,7 @@ export default function CampaignPage() {
                     {/* DONATION CARD - INSTANT VERSION */}
                     {status === 0 && !hasDeadlinePassed && (
                         <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 shadow-sm">
-                            <h3 className="text-lg font-bold text-blue-900 mb-4">⚡ Quick Donate</h3>
+                            <h3 className="text-lg font-bold text-blue-900 mb-4">Quick Donate</h3>
 
                             {!account ? (
                                 <div className="text-center py-4">
@@ -450,22 +475,22 @@ export default function CampaignPage() {
                                             value={donationAmount}
                                             onChange={(e) => setDonationAmount(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && !isDonating && handleDonate()}
-                                            placeholder="Amount in ETH"
-                                            step="0.0001"
-                                            min="0.0001"
+                                            placeholder="Amount in PHP"
+                                            step="1"
+                                            min="1"
                                             disabled={isDonating}
                                             className="pl-4 pr-16 py-3 w-full border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg font-semibold text-slate-700 disabled:opacity-50 disabled:bg-slate-100"
                                         />
                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
-                                            ETH
+                                            PHP
                                         </span>
                                     </div>
 
                                     {/* INSTANT DONATE BUTTON */}
                                     <button
                                         onClick={handleDonate}
-                                        disabled={isDonating || !donationAmount || parseFloat(donationAmount) < 0.0001}
-                                        className={`w-full py-4 text-lg font-bold rounded-lg transition-all duration-150 shadow-md ${isDonating || !donationAmount || parseFloat(donationAmount) < 0.0001
+                                        disabled={isDonating || !donationAmount || parseFloat(donationAmount) < 1}
+                                        className={`w-full py-4 text-lg font-bold rounded-lg transition-all duration-150 shadow-md ${isDonating || !donationAmount || parseFloat(donationAmount) < 1
                                                 ? "bg-blue-300 cursor-not-allowed text-blue-50"
                                                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg active:scale-[0.98]"
                                             }`}
@@ -479,12 +504,12 @@ export default function CampaignPage() {
                                                 Waiting for Wallet...
                                             </span>
                                         ) : (
-                                            `⚡ Donate ${donationAmount || '0'} ETH`
+                                            `Donate ₱${donationAmount || '0'}`
                                         )}
                                     </button>
 
                                     <p className="text-xs text-blue-400 text-center">
-                                        Direct transaction • No extra modals • Instant wallet popup
+                      
                                     </p>
                                 </div>
                             )}

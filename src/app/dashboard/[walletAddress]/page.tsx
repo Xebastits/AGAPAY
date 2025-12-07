@@ -5,7 +5,7 @@ import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import { MyCampaignCard } from "../../components/MyCampaignCard";
 import RejectionGuidanceModal from "../../components/RejectionGuidanceModal";
 import { useState, useEffect } from "react";
-import { getContract, toWei } from "thirdweb";
+import { getContract } from "thirdweb";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
 import { useNetwork } from '../../contexts/NetworkContext';
 
@@ -212,8 +212,17 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
     const [campaignImage, setCampaignImage] = useState<File | null>(null);
     const [idImage, setIdImage] = useState<File | null>(null);
 
-    const handleSubmit = async () => {
+const handleSubmit = async () => {
         if (!account) return alert("Connect wallet first");
+
+        // --- 🛑 ADDED VALIDATION HERE 🛑 ---
+        // This prevents "abc" or negative numbers from breaking the Admin Dashboard later
+        const numericGoal = parseFloat(goal);
+        if (isNaN(numericGoal) || numericGoal <= 0) {
+            return alert("Please enter a valid PHP goal amount (e.g., 1000 or 5000).");
+        }
+        // -----------------------------------
+
         if (!fullName || !name || !description || !age || !campaignImage || !idImage) {
             return alert("Please fill all fields, including your Full Name, and upload BOTH images.");
         }
@@ -221,22 +230,18 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
         try {
             setIsSubmitting(true);
 
-            // 1. Upload Images
             const campUrl = await uploadToCloudinary(campaignImage);
             const idUrl = await uploadToCloudinary(idImage);
 
-            // 2. LOGIC: Prepend string to Name if Emergency is checked.
-            // This ensures your "namecheck logic" (name.includes('emergency')) works elsewhere.
             const finalName = isEmergency ? `(EMERGENCY) ${name}` : name;
 
-            // 3. Save Data
             await addDoc(collection(db, "campaigns"), {
                 creator: account.address,
                 fullName: fullName,
-                name: finalName,    // <--- Sending the Modified Name
+                name: finalName,
                 description: description,
                 age: age,
-                goal: goal,
+                goal: goal, 
                 deadline: deadline,
                 isEmergency: isEmergency,
                 imageUrl: campUrl,
@@ -307,13 +312,15 @@ const CreateCampaignModal = ({ setIsModalOpen, refreshRequests }: CreateCampaign
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-bold mb-1">Goal (ETH)</label>
+                            <label className="block text-sm font-bold mb-1">Goal (PHP)</label>
                             <input
-                                type="text"
+                                type="number"
+                                step="1"
+                                min="1"
                                 value={goal}
                                 onChange={(e) => setGoal(e.target.value)}
                                 className="w-full px-3 py-2 border rounded"
-                                placeholder="e.g., 1.5"
+                                placeholder="e.g., 1000"
                             />
                         </div>
                         <div>

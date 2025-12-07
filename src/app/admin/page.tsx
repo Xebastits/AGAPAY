@@ -6,7 +6,7 @@ import { useActiveAccount, useReadContract } from "thirdweb/react";
 import { isAdmin } from "../constants/admins"; 
 import { db } from "../lib/firebase"; 
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
-import { prepareContractCall, getContract, defineChain, toWei } from "thirdweb"; // Added toWei
+import { prepareContractCall, getContract, defineChain } from "thirdweb";
 import { useSendTransaction } from "thirdweb/react";
 import { client } from "@/app/client"; 
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
@@ -17,7 +17,7 @@ interface Campaign {
   id: string;
   name: string;
   description: string;
-  goal: number;
+  goal: string;
   deadline: number;
   idImageUrl: string;
   status: string;
@@ -133,19 +133,16 @@ const { selectedChain, setSelectedChain } = useNetwork();
 
     try {
         console.log("Deploying for Owner:", campaignToApprove.creator);
-        
-        // Convert Goal to Wei
-        const goalInWei = toWei(campaignToApprove.goal.toString());
 
         const transaction = prepareContractCall({
             contract: factoryContract,
             method: "function createCampaign(address _owner, string _name, string _description, uint256 _goal, uint256 _durationInDays)",
             params: [
-                campaignToApprove.creator, 
+                campaignToApprove.creator,
                 campaignToApprove.name,
                 campaignToApprove.description,
-                goalInWei, 
-                BigInt(campaignToApprove.deadline || 30), 
+                BigInt(campaignToApprove.goal),
+                BigInt(campaignToApprove.deadline || 30),
             ],
         });
 
@@ -252,7 +249,7 @@ const { selectedChain, setSelectedChain } = useNetwork();
                                 <p className="text-sm text-slate-500 mb-2 font-mono">Creator: {campaign.creator}</p>
                                 <p className="text-slate-600 mb-4 bg-slate-50 p-3 rounded">{campaign.description}</p>
                                 <div className="flex gap-4 text-sm font-medium text-slate-700">
-                                    <span className="bg-blue-50 px-2 py-1 rounded border border-blue-100">Goal: {campaign.goal} ETH</span>
+                                    <span className="bg-blue-50 px-2 py-1 rounded border border-blue-100">Goal: ₱{campaign.goal}</span>
                                     <span className="bg-blue-50 px-2 py-1 rounded border border-blue-100">Duration: {campaign.deadline} Days</span>
                                 </div>
                             </div>
