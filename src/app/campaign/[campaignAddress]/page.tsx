@@ -336,8 +336,7 @@ export default function CampaignPage() {
                                             placeholder="Amount in PHP"
                                             disabled={isProcessing}
                                             className="pl-4 py-3 w-full border rounded text-lg font-bold"
-                                        />
-                                        <span className="absolute right-4 top-3 font-bold text-slate-400">PHP</span>
+                                            />  
                                     </div>
                                     
                                     <button
