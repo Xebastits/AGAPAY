@@ -1,17 +1,15 @@
 'use client';
 import { useReadContract } from "thirdweb/react";
-import { client } from "@/app/client"; // Adjust path if needed
+import { client } from "@/app/client"; 
 import { getContract } from "thirdweb";
-import { CampaignCard } from "../components/CampaignCard"; // Adjust path if needed
+import { CampaignCard } from "../components/CampaignCard"; // Ensure this path is correct
 import { CROWDFUNDING_FACTORY } from "@/app/constants/contracts";
 import { useState, useEffect } from "react";
-import { polygonAmoy, sepolia } from "thirdweb/chains";
 import { useNetwork } from '../contexts/NetworkContext';
-
 
 export default function CampaignsPage() {
 
-  const { selectedChain, setSelectedChain } = useNetwork();
+  const { selectedChain } = useNetwork();
   const contract = getContract({
     client: client,
     chain: selectedChain,
@@ -26,7 +24,9 @@ export default function CampaignsPage() {
   });
 
   const [showEmergencyFirst, setShowEmergencyFirst] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('all');
+  
+  // 1. SET DEFAULT FILTER TO 'active'
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'successful' | 'failed'>('active');
 
   // Load Preference
   useEffect(() => {
@@ -49,16 +49,11 @@ export default function CampaignsPage() {
         const aIsEmergency = a.name.toLowerCase().includes('emergency');
         const bIsEmergency = b.name.toLowerCase().includes('emergency');
 
-        // If A is emergency and B is not -> A goes first
         if (aIsEmergency && !bIsEmergency) return -1;
-        // If B is emergency and A is not -> B goes first
         if (!aIsEmergency && bIsEmergency) return 1;
-        
-        // If both are Emergency (or both are NOT), we fall through to step 2...
     }
 
     // 2. TIME SORT: Most Recent First (Descending)
-    // We compare the timestamps (bigint) directly.
     return Number(b.creationTime) - Number(a.creationTime);
 
   }) : [];
@@ -125,7 +120,7 @@ export default function CampaignsPage() {
   );
 }
 
-// --- HELPER COMPONENT ---
+// --- HELPER COMPONENT WITH SMART STATUS LOGIC ---
 type CampaignWithStatusProps = {
   campaignAddress: string;
   showEmergencyFirst: boolean;
@@ -134,23 +129,49 @@ type CampaignWithStatusProps = {
 };
 
 const CampaignWithStatus: React.FC<CampaignWithStatusProps> = ({ campaignAddress, showEmergencyFirst, selectedFilter, creationTime }) => {
+  const { selectedChain } = useNetwork();
+  
   const contract = getContract({
     client: client,
-    chain: polygonAmoy,
+    chain: selectedChain,
     address: campaignAddress,
   });
 
-  const { data: status } = useReadContract({
-    contract: contract,
-    method: "function state() view returns (uint8)",
-    params: [],
-  });
+  // Fetch ALL necessary data to determine real status
+  const { data: state } = useReadContract({ contract, method: "function state() view returns (uint8)", params: [] });
+  const { data: deadline } = useReadContract({ contract, method: "function deadline() view returns (uint256)", params: [] });
+  const { data: balance } = useReadContract({ contract, method: "function getContractBalance() view returns (uint256)", params: [] });
+  const { data: goal } = useReadContract({ contract, method: "function goal() view returns (uint256)", params: [] });
 
-  const statusString = status === 0 ? 'active' : status === 1 ? 'successful' : status === 2 ? 'failed' : 'unknown';
+  let derivedStatus = 'unknown';
 
-  if (selectedFilter !== 'all' && statusString !== selectedFilter) {
+  // Only calculate if we have all data
+  if (state !== undefined && deadline && balance !== undefined && goal !== undefined) {
+      const now = Date.now() / 1000;
+      const isExpired = now >= Number(deadline);
+      const isGoalMet = balance >= goal;
+
+      // 1. FAILED: Explicitly failed OR (Active + Expired + Goal Not Met)
+      if (state === 2 || (state === 0 && isExpired && !isGoalMet)) {
+          derivedStatus = 'failed';
+      } 
+      // 2. SUCCESSFUL: Explicitly success OR (Active + Goal Met)
+      else if (state === 1 || (state === 0 && isGoalMet)) {
+          derivedStatus = 'successful';
+      } 
+      // 3. ACTIVE: Explicitly Active + Not Expired + Goal Not Met
+      else if (state === 0 && !isExpired && !isGoalMet) {
+          derivedStatus = 'active';
+      }
+  }
+
+  // Filter Logic
+  if (selectedFilter !== 'all' && derivedStatus !== selectedFilter) {
     return null;
   }
+
+  // Prevent flickering while loading data
+  if (derivedStatus === 'unknown') return null;
 
   return (
     <CampaignCard 
