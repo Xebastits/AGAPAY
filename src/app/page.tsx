@@ -1,7 +1,8 @@
 "use client";
 
 import { client } from "@/app/client";
-import { ConnectButton, useActiveAccount } from "thirdweb/react";
+import { useActiveAccount } from "thirdweb/react";
+import { ConnectButton } from "./components/LazyConnectButton";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { isAdmin } from "./constants/admins";

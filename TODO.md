@@ -1,4 +1,0 @@
-- [x] Import RejectionGuidanceModal in dashboard page
-- [x] Add state variables for modal: isRejectionModalOpen and selectedRejectedRequest
-- [x] Make rejected request div clickable with onClick handler
-- [x] Render RejectionGuidanceModal component with props

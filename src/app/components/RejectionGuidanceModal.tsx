@@ -39,7 +39,7 @@ export default function RejectionGuidanceModal({
                 <div className="text-sm text-slate-700 mb-6">
                     <div className="mb-4">
                         <h3 className="font-bold text-lg mb-2">
-                            Your campaign "{request.name}" was rejected
+                            Your campaign &quot;{request.name}&quot; was rejected
                         </h3>
 
                         {request.rejectionReason && (

@@ -3,14 +3,13 @@
 import { client } from "@/app/client";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import Image from "next/image"; // 1. OPTIMIZED IMAGE IMPORT
+import Image from "next/image";
 import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import {
     useActiveAccount,
     useReadContract,
     useActiveWalletChain,
     useSwitchActiveWalletChain,
-    ConnectButton,
     useWalletBalance,
     lightTheme
 } from "thirdweb/react";
@@ -18,6 +17,7 @@ import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { useNetwork } from '../../contexts/NetworkContext';
 import { db } from "@/app/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { ConnectButton } from "../../components/LazyConnectButton";
 
 const wallets = [
     inAppWallet({ auth: { options: ["email", "google", "apple", "facebook"] } }),
@@ -32,9 +32,12 @@ export default function CampaignPage() {
     const switchChain = useSwitchActiveWalletChain();
     const { campaignAddress } = useParams();
 
+    // State
     const [donationAmount, setDonationAmount] = useState<string>("");
     const [imageUrl, setImageUrl] = useState<string>("");
     const [creatorFullName, setCreatorFullName] = useState<string>("");
+    const [createdTimestamp, setCreatedTimestamp] = useState<number | null>(null); // New State
+
     const [isProcessing, setIsProcessing] = useState(false);
     const [txHash, setTxHash] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -49,6 +52,7 @@ export default function CampaignPage() {
 
     const formatCurrency = (val: bigint | undefined) => val ? val.toString() : "0";
 
+    // --- CONTRACT READS ---
     const { data: name } = useReadContract({ contract, method: "function name() view returns (string)", params: [] });
     const { data: description } = useReadContract({ contract, method: "function description() view returns (string)", params: [] });
     const { data: deadline } = useReadContract({ contract, method: "function deadline() view returns (uint256)", params: [] });
@@ -57,10 +61,19 @@ export default function CampaignPage() {
     const { data: owner } = useReadContract({ contract, method: "function owner() view returns (address)", params: [] });
     const { data: status } = useReadContract({ contract, method: "function state() view returns (uint8)", params: [] });
 
-    const deadlineDate = deadline ? new Date(parseInt(deadline.toString()) * 1000) : null;
+    // --- DATE LOGIC ---
+    // Blockchain returns seconds, JS uses milliseconds
+    const deadlineDate = deadline ? new Date(Number(deadline) * 1000) : null;
+    const createdDate = createdTimestamp ? new Date(createdTimestamp) : null;
     const hasDeadlinePassed = deadlineDate ? deadlineDate < new Date() : false;
 
-    // --- LOGIC ---
+    // Helper to format dates nicely
+    const formatDate = (date: Date | null) => {
+        if (!date) return "Loading...";
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
+    // --- CALCULATION LOGIC ---
     const totalBalance = balance ? Number(balance) : 0;
     const totalGoal = goal ? Number(goal) : 0;
     let percentage = totalGoal > 0 ? (totalBalance / totalGoal) * 100 : 0;
@@ -71,6 +84,7 @@ export default function CampaignPage() {
     const isFundsWithdrawn = Boolean(isSuccessful && balance !== undefined && balance === 0n);
     const canWithdraw = Boolean(owner === account?.address && isSuccessful && balance !== undefined && balance > 0n);
 
+    // --- FETCH FIREBASE METADATA ---
     useEffect(() => {
         const fetchMetadata = async () => {
             if (!name) return;
@@ -81,12 +95,14 @@ export default function CampaignPage() {
                     const data = snapshot.docs[0].data();
                     setImageUrl(data.imageUrl);
                     setCreatorFullName(data.fullName || "");
+                    setCreatedTimestamp(data.createdAt || null); // Fetch created date
                 }
             } catch (err) { console.error(err); }
         };
         fetchMetadata();
     }, [name]);
 
+    // --- DONATE HANDLER ---
     const handleDonate = async () => {
         if (!donationAmount || donationAmount.includes(".") || isNaN(Number(donationAmount)) || Number(donationAmount) < 1) {
             showToast("Invalid amount. Integers only (Wei).", 'error');
@@ -96,7 +112,7 @@ export default function CampaignPage() {
         if (activeChain?.id !== selectedChain.id) { try { await switchChain(selectedChain); } catch { return showToast("Switch network failed", 'error'); } }
 
         setIsProcessing(true);
-        showToast("⏳ Confirming donation...", 'info');
+        showToast("Confirming donation...", 'info');
 
         try {
             let val = BigInt(donationAmount);
@@ -124,7 +140,7 @@ export default function CampaignPage() {
 
     const handleWithdraw = async () => {
         if (!account) return;
-        if (userBalance && userBalance.value === 0n) return showToast("❌ Need gas for fees", 'error');
+        if (userBalance && userBalance.value === 0n) return showToast(" Need gas for fees", 'error');
         setIsProcessing(true);
         showToast("⏳ Confirming withdrawal...", 'info');
         try {
@@ -153,21 +169,21 @@ export default function CampaignPage() {
         <div className="mx-auto max-w-7xl px-4 mt-8 sm:px-6 lg:px-8 pb-20">
             {toast && <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-xl text-white font-bold ${toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'}`}>{toast.message}</div>}
 
-            {/* 2. OPTIMIZED IMAGE: Uses next/image instead of img */}
+            {/* HERO IMAGE */}
             <div className="max-w-2xl mx-auto h-56 md:h-80 bg-slate-100 rounded-xl overflow-hidden mb-8 shadow-sm relative">
                 {imageUrl ? (
-                    <Image 
-                        src={imageUrl} 
-                        alt={name || ""} 
-                        fill 
-                        className="object-cover" 
+                    <Image
+                        src={imageUrl}
+                        alt={name || ""}
+                        fill
+                        className="object-cover"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        priority // High priority for Hero image (LCP)
+                        priority
                     />
                 ) : (
                     <div className="flex items-center justify-center h-full text-slate-400">No Cover Image</div>
                 )}
-                
+
                 {status !== undefined && (
                     <div className="absolute top-4 right-4 px-4 py-2 text-sm font-bold rounded-full shadow-md text-white bg-blue-600 uppercase z-10">
                         {status === 0 ? "Active" : status === 1 ? "Successful" : "Failed"}
@@ -175,10 +191,21 @@ export default function CampaignPage() {
                 )}
             </div>
 
+            {/* HEADER: Title & Creator Info */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h1 className="text-4xl font-bold text-slate-900">{name || "Loading..."}</h1>
-                    <h2 className="text-xl text-slate-700">Creator: {creatorFullName}</h2>
+                    <div className="flex flex-col gap-1 mt-1">
+                        <h2 className="text-xl text-slate-700">Creator: <span className="font-semibold">{creatorFullName}</span></h2>
+                        {owner && (
+                            <p className="text-xs text-slate-400 font-mono flex items-center gap-1">
+                                <span>{owner}</span>
+                                <a href={`https://sepolia.etherscan.io/address/${owner}`} target="_blank" className="hover:text-blue-500">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                </a>
+                            </p>
+                        )}
+                    </div>
                 </div>
                 {canWithdraw && (
                     <button onClick={handleWithdraw} disabled={isProcessing} className={`px-6 py-3 font-bold rounded-lg shadow-md text-white ${isProcessing ? "bg-green-400" : "bg-green-600 hover:bg-green-700"}`}>
@@ -188,12 +215,44 @@ export default function CampaignPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <h3 className="text-lg font-bold mb-4 border-b pb-2">About</h3>
-                    <p className="text-slate-600 whitespace-pre-wrap">{description}</p>
-                    {txHash && <p className="mt-4 text-sm text-green-600 break-all">Last TX: {txHash}</p>}
+                {/* LEFT COLUMN: About & Details */}
+                <div className="md:col-span-2 space-y-6">
+
+                    {/* NEW: DETAILS GRID */}
+                    <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                        <div>
+                            <p className="text-slate-500 font-bold mb-1 uppercase text-xs tracking-wider">Created On</p>
+                            <p className="text-slate-800 font-medium">{formatDate(createdDate)}</p>
+                        </div>
+                        <div>
+                            <p className="text-slate-500 font-bold mb-1 uppercase text-xs tracking-wider">Deadline</p>
+                            <p className={`font-medium ${hasDeadlinePassed ? 'text-red-600' : 'text-slate-800'}`}>
+                                {formatDate(deadlineDate)}
+                            </p>
+                        </div>
+                        <div className="sm:col-span-2 pt-4 border-t border-slate-200">
+                            <p className="text-slate-500 font-bold mb-1 uppercase text-xs tracking-wider">Smart Contract Address (Sepolia)</p>
+                            <a
+                                href={`https://sepolia.etherscan.io/address/${campaignAddress}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-mono break-all"
+                            >
+                                {campaignAddress}
+                                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                        <h3 className="text-lg font-bold mb-4 border-b pb-2">About</h3>
+                        <p className="text-slate-600 whitespace-pre-wrap">{description}</p>
+                    </div>
+
+                    {txHash && <p className="mt-4 text-sm text-green-600 break-all bg-green-50 p-2 rounded border border-green-100">Last Transaction: {txHash}</p>}
                 </div>
 
+                {/* RIGHT COLUMN: Stats & Action */}
                 <div className="flex flex-col gap-6">
                     {!isFundsWithdrawn && !isSuccessful && (
                         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
@@ -211,8 +270,8 @@ export default function CampaignPage() {
                         </div>
                     )}
 
-                    {isFundsWithdrawn && <div className="bg-gray-100 p-6 rounded text-center border border-gray-300"><h3 className="text-xl font-bold text-gray-600">🏁 Campaign Finished</h3><p className="text-sm text-gray-500">Funds withdrawn.</p></div>}
-                    {!isFundsWithdrawn && isSuccessful && <div className="bg-green-100 p-6 rounded text-center border border-green-200"><h3 className="text-xl font-bold text-green-800">🎉 Goal Reached!</h3></div>}
+                    {isFundsWithdrawn && <div className="bg-gray-100 p-6 rounded-lg text-center border border-gray-300"><h3 className="text-xl font-bold text-gray-600"> Campaign Finished</h3><p className="text-sm text-gray-500">Funds withdrawn.</p></div>}
+                    {!isFundsWithdrawn && isSuccessful && <div className="bg-green-100 p-6 rounded-lg text-center border border-green-200"><h3 className="text-xl font-bold text-green-800">Goal Reached!</h3></div>}
 
                     {!isSuccessful && !hasDeadlinePassed && status === 0 && (
                         <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 shadow-sm">
@@ -223,14 +282,14 @@ export default function CampaignPage() {
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-4 gap-2">
                                         {presetAmounts.map((amt) => (
-                                            <button key={amt} onClick={() => setDonationAmount(amt)} disabled={isProcessing} className={`px-3 py-2 text-xs font-bold border-2 rounded ${donationAmount === amt ? 'bg-blue-600 text-white' : 'bg-white'}`}>{amt}</button>
+                                            <button key={amt} onClick={() => setDonationAmount(amt)} disabled={isProcessing} className={`px-3 py-2 text-xs font-bold border-2 rounded transition-colors ${donationAmount === amt ? 'bg-blue-600 text-white' : 'bg-white hover:bg-blue-50'}`}>{amt}</button>
                                         ))}
                                     </div>
                                     <div className="relative">
                                         <input type="number" value={donationAmount} onChange={(e) => setDonationAmount(e.target.value)} placeholder="Amount in PHP" disabled={isProcessing} className="pl-4 py-3 w-full border rounded text-lg font-bold" />
-                                        <span className="absolute right-4 top-3 font-bold text-slate-400">PHP</span>
+                                        <span className="absolute right-6 top-3 font-bold text-slate-400">PHP</span>
                                     </div>
-                                    <button onClick={handleDonate} disabled={isProcessing || !donationAmount || donationAmount.includes(".") || isNaN(Number(donationAmount)) || Number(donationAmount) < 1} className={`w-full py-4 text-lg font-bold rounded shadow text-white ${isProcessing || !donationAmount ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"}`}>
+                                    <button onClick={handleDonate} disabled={isProcessing || !donationAmount || donationAmount.includes(".") || isNaN(Number(donationAmount)) || Number(donationAmount) < 1} className={`w-full py-3 text-lg font-bold rounded shadow text-white transition-all ${isProcessing || !donationAmount ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"}`}>
                                         {isProcessing ? "Processing..." : `Donate ₱${donationAmount || '0'}`}
                                     </button>
                                 </div>
@@ -239,7 +298,7 @@ export default function CampaignPage() {
                     )}
 
                     {status === 2 && (
-                        <div className="bg-red-50 p-6 rounded text-center border border-red-100">
+                        <div className="bg-red-50 p-6 rounded-lg text-center border border-red-100">
                             <h3 className="text-red-800 font-bold mb-2">Campaign Failed</h3>
                             <button onClick={handleRefund} disabled={isProcessing} className="w-full py-3 bg-red-600 text-white font-bold rounded hover:bg-red-700">{isProcessing ? "Processing..." : "Claim Refund"}</button>
                         </div>

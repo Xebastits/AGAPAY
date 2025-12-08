@@ -1,11 +1,12 @@
 "use client";
 
 import { client } from "@/app/client";
-import { ConnectButton, useActiveAccount } from "thirdweb/react";
+import {useActiveAccount } from "thirdweb/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { isAdmin } from "../constants/admins";
 import { defineChain } from "thirdweb/chains";
+import { ConnectButton } from "../components/LazyConnectButton";
 
 const POLYGON_AMOY = defineChain(80002);
 const SEPOLIA = defineChain(11155111);

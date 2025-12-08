@@ -1,7 +1,8 @@
 'use client';
 import { client } from "@/app/client";
 import Link from "next/link";
-import { ConnectButton, lightTheme, useActiveAccount } from "thirdweb/react";
+import { lightTheme, useActiveAccount } from "thirdweb/react";
+import { ConnectButton } from "../components/LazyConnectButton";
 import Image from 'next/image';
 import thirdwebIcon from "../favicon.ico";
 import { usePathname } from "next/navigation";
